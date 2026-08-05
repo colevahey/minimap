@@ -3,6 +3,11 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
+  server: {
+    // Sensor features need HTTPS (§11) — dev-server host-check would otherwise
+    // reject requests tunneled in through a random *.trycloudflare.com host.
+    allowedHosts: true,
+  },
   plugins: [
     react(),
     VitePWA({
