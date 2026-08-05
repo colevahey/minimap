@@ -1,4 +1,4 @@
-# SITELINE — Building Identifier PWA · Implementation Plan
+# MINIMAP — Building Identifier PWA · Implementation Plan
 
 A point-and-identify app: aim your phone at a building in a supported metro and it
 highlights the building and shows height, floors, year built, and owner. Launch city
@@ -60,7 +60,7 @@ static host). All data sources are open — **no API keys anywhere**.
 ## 2. Repo structure
 
 ```
-siteline/
+minimap/
 ├── README.md
 ├── PLAN.md                      # this file
 ├── package.json

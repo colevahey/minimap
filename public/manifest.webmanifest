@@ -1,6 +1,6 @@
 {
-  "name": "Siteline",
-  "short_name": "Siteline",
+  "name": "Minimap",
+  "short_name": "Minimap",
   "description": "Point your phone at a building to identify it.",
   "start_url": "/",
   "scope": "/",

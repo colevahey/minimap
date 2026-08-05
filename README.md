@@ -1,4 +1,4 @@
-# Siteline
+# Minimap
 
 Point your phone at a building to identify it — height, floors, year built, and
 registered owner. Launch city is Seattle / King County; NYC is the second city.

@@ -42,7 +42,7 @@ export function App({ controller }: AppProps) {
           style={{ pointerEvents: 'auto', maxWidth: 360 }}
         >
           <Text as="h1" font="title3">
-            Siteline
+            Minimap
           </Text>
 
           <HStack gap={1}>

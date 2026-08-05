@@ -1,5 +1,5 @@
 {
-  "name": "siteline",
+  "name": "minimap",
   "version": "0.0.1",
   "description": "Point-and-identify building app (geo-first, vision-later)",
   "private": true,
