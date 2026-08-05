@@ -108,6 +108,20 @@ export class MapModeController {
   }
 
   private setupLayers(): void {
+    // The basemap draws its own OSM-derived buildings as a fill-extrusion
+    // (layer "building-3d", always active at z>=14 regardless of pitch). Our
+    // buildings-fill used to be a flat `fill` layer painted on top of that in
+    // the style's layer order, so at any pitch it visually floated near the
+    // rooftops instead of hugging the ground — not a geometry problem, a
+    // rendering one. Fix: extrude our own layer with our own height_m data
+    // (properly depth-composited against other 3D layers) and hide the
+    // basemap's competing building geometry so there's only one 3D city, not two.
+    for (const basemapLayer of ['building', 'building-3d']) {
+      if (this.map.getLayer(basemapLayer)) {
+        this.map.setLayoutProperty(basemapLayer, 'visibility', 'none');
+      }
+    }
+
     this.map.addSource(BUILDINGS_SOURCE, {
       type: 'vector',
       url: pmtilesUrl('/tiles/sea.pmtiles'),
@@ -115,12 +129,19 @@ export class MapModeController {
     });
     this.map.addLayer({
       id: 'buildings-fill',
-      type: 'fill',
+      type: 'fill-extrusion',
       source: BUILDINGS_SOURCE,
       'source-layer': BUILDINGS_SOURCE_LAYER,
       paint: {
-        'fill-color': ['case', ['boolean', ['feature-state', 'highlight'], false], '#ff9d3f', '#5db8ff'],
-        'fill-opacity': ['case', ['boolean', ['feature-state', 'highlight'], false], 0.85, 0.35],
+        'fill-extrusion-color': ['case', ['boolean', ['feature-state', 'highlight'], false], '#ff9d3f', '#5db8ff'],
+        // fill-extrusion-opacity is constant-only in the style spec (unlike
+        // -color) — no data/feature-state expressions — so highlight has to
+        // be color-only here; color contrast alone reads fine at this opacity.
+        'fill-extrusion-opacity': 0.75,
+        // Most footprints get a real height_m from floors × 3.5m (§3); the rest
+        // (no Assessor match) fall back to a flat ~1-story placeholder.
+        'fill-extrusion-height': ['coalesce', ['get', 'height_m'], 3.5],
+        'fill-extrusion-base': 0,
       },
     });
     this.map.addLayer({
