@@ -1,0 +1,11 @@
+node_modules/
+dist/
+pipeline/data/*
+!pipeline/data/SOURCES.md
+public/tiles/*.pmtiles
+pipeline/__pycache__/
+pipeline/cities/__pycache__/
+**/__pycache__/
+*.pyc
+.venv/
+.DS_Store
