@@ -120,7 +120,7 @@ export function App({ controller }: AppProps) {
           {hit ? (
             <>
               <Text as="h2" font="title3">
-                {hit.b.name ?? `Building ${hit.b.id}`}
+                {hit.b.name ?? 'Unidentified building'}
               </Text>
               <Text font="body" color="fgMuted">
                 {[
