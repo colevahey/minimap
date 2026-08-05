@@ -25,7 +25,10 @@ export function queryNearbyBuildings(map: MapLibreMap): BuildingWithRing[] {
       year_built: props.year_built as number | undefined,
       owner: props.owner as string | undefined,
       source: String(props.source),
-      attrs: props.attrs as Record<string, string | number> | undefined,
+      // MVT/tippecanoe flattens nested objects to a JSON string — the pipeline
+      // (pipeline/schema.py) emits `attrs` as a real object, but by the time
+      // it round-trips through sea.pmtiles it arrives here as a string.
+      attrs: typeof props.attrs === 'string' ? JSON.parse(props.attrs) : undefined,
       ring,
     });
   }
