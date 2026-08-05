@@ -5,6 +5,8 @@ export interface Pose {
   headingDeg: number | null; // degrees clockwise from true north
   pitchDeg: number | null; // device pitch, needed for §8 height-occlusion in AR mode
   headingSource: 'compass' | 'manual' | null;
+  /** webkitCompassAccuracy in degrees; <0 or >25 means poor (§6, "figure-8 to calibrate"). null off iOS/no reading yet. */
+  headingAccuracyDeg: number | null;
 }
 
 export type PoseListener = (pose: Pose) => void;
@@ -77,6 +79,7 @@ export class PoseManager {
     headingDeg: null,
     pitchDeg: null,
     headingSource: null,
+    headingAccuracyDeg: null,
   };
 
   private readonly smoother = new HeadingSmoother();
@@ -103,6 +106,7 @@ export class PoseManager {
   setManualHeading(headingDeg: number): void {
     this.pose.headingDeg = ((headingDeg % 360) + 360) % 360;
     this.pose.headingSource = 'manual';
+    this.pose.headingAccuracyDeg = null;
     this.emit();
   }
 
@@ -132,7 +136,9 @@ export class PoseManager {
   async startCompass(): Promise<'granted' | 'denied' | 'unsupported'> {
     const result = await requestCompassPermission();
     if (result !== 'granted') return result;
-    const handler = (event: DeviceOrientationEvent & { webkitCompassHeading?: number }) => {
+    const handler = (
+      event: DeviceOrientationEvent & { webkitCompassHeading?: number; webkitCompassAccuracy?: number },
+    ) => {
       this.latestEvent = event;
       if (this.rafPending) return;
       this.rafPending = true;
@@ -144,6 +150,8 @@ export class PoseManager {
         const smoothed = this.smoother.push(raw);
         this.pose.headingDeg = ((smoothed + this.manualOffsetDeg) % 360 + 360) % 360;
         this.pose.headingSource = 'compass';
+        const accuracy = (this.latestEvent as { webkitCompassAccuracy?: number }).webkitCompassAccuracy;
+        this.pose.headingAccuracyDeg = typeof accuracy === 'number' ? accuracy : null;
         this.emit();
       });
     };

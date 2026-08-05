@@ -13,7 +13,7 @@ mapContainer.id = 'map-root';
 mapContainer.style.position = 'absolute';
 mapContainer.style.inset = '0';
 root.appendChild(mapContainer);
-initMapMode(mapContainer);
+const controller = initMapMode(mapContainer);
 
 const uiContainer = document.createElement('div');
 uiContainer.id = 'ui-root';
@@ -29,7 +29,7 @@ const activeColorScheme = window.matchMedia('(prefers-color-scheme: dark)').matc
 createRoot(uiContainer).render(
   <StrictMode>
     <ThemeProvider theme={defaultTheme} activeColorScheme={activeColorScheme}>
-      <App />
+      <App controller={controller} />
     </ThemeProvider>
   </StrictMode>,
 );
