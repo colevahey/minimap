@@ -21,12 +21,13 @@ export function App({ controller }: AppProps) {
   const [state, setState] = useState<MapModeState>(() => ({
     pose: controller.pose.getPose(),
     hit: null,
+    city: 'sea',
   }));
   const [compassStatus, setCompassStatus] = useState<CompassStatus>('idle');
 
   useEffect(() => controller.onUpdate(setState), [controller]);
 
-  const { pose, hit } = state;
+  const { pose, hit, city } = state;
   const poorAccuracy =
     pose.headingAccuracyDeg !== null && (pose.headingAccuracyDeg < 0 || pose.headingAccuracyDeg > 25);
 
@@ -41,9 +42,19 @@ export function App({ controller }: AppProps) {
           elevation={2}
           style={{ pointerEvents: 'auto', maxWidth: 360 }}
         >
-          <Text as="h1" font="title3">
-            Minimap
-          </Text>
+          <HStack gap={2} style={{ alignItems: 'baseline' }}>
+            <Text as="h1" font="title3">
+              Minimap
+            </Text>
+            <HStack gap={0.5}>
+              <Button size="xs" variant={city === 'sea' ? 'primary' : 'tertiary'} onClick={() => controller.switchCity('sea')}>
+                Seattle
+              </Button>
+              <Button size="xs" variant={city === 'nyc' ? 'primary' : 'tertiary'} onClick={() => controller.switchCity('nyc')}>
+                NYC
+              </Button>
+            </HStack>
+          </HStack>
 
           <HStack gap={1}>
             <Button size="s" variant={pose.position ? 'secondary' : 'primary'} onClick={() => controller.useMyLocation()}>

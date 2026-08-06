@@ -103,6 +103,15 @@ export class PoseManager {
     this.emit();
   }
 
+  /** Clears position/heading (e.g. an old position is meaningless after jumping cities). Live compass/geolocation watches, if running, keep running and will overwrite this on their next reading. */
+  reset(): void {
+    this.pose.position = null;
+    this.pose.headingDeg = null;
+    this.pose.headingSource = null;
+    this.pose.headingAccuracyDeg = null;
+    this.emit();
+  }
+
   setManualHeading(headingDeg: number): void {
     this.pose.headingDeg = ((headingDeg % 360) + 360) % 360;
     this.pose.headingSource = 'manual';

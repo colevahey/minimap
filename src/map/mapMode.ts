@@ -5,10 +5,20 @@ import { toGeo } from '../core/geo';
 import { PoseManager, type Pose } from '../core/pose';
 import { raycast, type RaycastHit } from '../core/raycast';
 import { queryNearbyBuildings } from '../core/buildings';
-import type { LngLat } from '../core/types';
+import type { CityCode, LngLat } from '../core/types';
 
-// Downtown Seattle — launch city center (§0, §10 M0 DoD).
-const SEATTLE_CENTER: [number, number] = [-122.3321, 47.6062];
+interface CityConfig {
+  center: [number, number];
+  pmtilesPath: string;
+}
+
+// §10 M3: switching cities is map-mode/config-only — core/geo, core/raycast,
+// core/buildings, core/pose stay untouched, they never knew "Seattle" or "NYC"
+// in the first place.
+const CITY_CONFIG: Record<CityCode, CityConfig> = {
+  sea: { center: [-122.3321, 47.6062], pmtilesPath: '/tiles/sea.pmtiles' }, // downtown Seattle
+  nyc: { center: [-73.9857, 40.7484], pmtilesPath: '/tiles/nyc.pmtiles' }, // Empire State Building, Manhattan
+};
 
 // No API keys anywhere (§1): OpenFreeMap serves this style + its basemap tiles for free.
 const BASEMAP_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
@@ -70,6 +80,7 @@ function rayCastPoint(observer: LngLat, headingDeg: number, distanceM: number): 
 export interface MapModeState {
   pose: Pose;
   hit: RaycastHit | null;
+  city: CityCode;
 }
 
 export type MapModeListener = (state: MapModeState) => void;
@@ -87,6 +98,7 @@ export class MapModeController {
   private readonly listeners = new Set<MapModeListener>();
   private currentHit: RaycastHit | null = null;
   private layersReady = false;
+  private city: CityCode = 'sea';
 
   constructor(container: HTMLElement) {
     ensurePmtilesProtocol();
@@ -94,7 +106,7 @@ export class MapModeController {
     this.map = new maplibregl.Map({
       container,
       style: BASEMAP_STYLE,
-      center: SEATTLE_CENTER,
+      center: CITY_CONFIG[this.city].center,
       zoom: 15.5,
       pitch: 0,
       attributionControl: { compact: true },
@@ -124,7 +136,7 @@ export class MapModeController {
 
     this.map.addSource(BUILDINGS_SOURCE, {
       type: 'vector',
-      url: pmtilesUrl('/tiles/sea.pmtiles'),
+      url: pmtilesUrl(CITY_CONFIG[this.city].pmtilesPath),
       promoteId: 'id',
     });
     this.map.addLayer({
@@ -233,15 +245,33 @@ export class MapModeController {
   }
 
   private emit(pose: Pose): void {
-    const state: MapModeState = { pose, hit: this.currentHit };
+    const state: MapModeState = { pose, hit: this.currentHit, city: this.city };
     for (const listener of this.listeners) listener(state);
   }
 
-  /** Subscribes to pose/hit updates; immediately replays the current state. */
+  /** Subscribes to pose/hit/city updates; immediately replays the current state. */
   onUpdate(listener: MapModeListener): () => void {
     this.listeners.add(listener);
-    listener({ pose: this.pose.getPose(), hit: this.currentHit });
+    listener({ pose: this.pose.getPose(), hit: this.currentHit, city: this.city });
     return () => this.listeners.delete(listener);
+  }
+
+  /** Swaps the buildings vector source to the other city's tiles and re-centers. */
+  switchCity(city: CityCode): void {
+    if (city === this.city) return;
+    this.city = city;
+    const config = CITY_CONFIG[city];
+
+    if (this.layersReady) {
+      const source = this.map.getSource(BUILDINGS_SOURCE) as maplibregl.VectorTileSource;
+      source.setUrl(pmtilesUrl(config.pmtilesPath));
+    }
+
+    this.pose.reset();
+    // jumpTo, not flyTo — an animated flight across a ~3900km Seattle<->NYC
+    // gap is a multi-second detour, not a nice touch, for what's really just
+    // a city switch.
+    this.map.jumpTo({ center: config.center, zoom: 15.5 });
   }
 
   useMyLocation(): void {

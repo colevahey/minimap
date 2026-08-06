@@ -33,3 +33,34 @@ one-parcel-at-a-time page, not a bulk source. Seattle buildings ship with
 `owner` absent (the schema already treats it as optional); NYC (M3) will
 carry a real `owner` via MapPLUTO's `ownername` field.
 
+## NYC (M3, retrieved 2026-08-06)
+
+Both datasets are on NYC Open Data (Socrata/SODA API), queried directly rather
+than downloaded as bulk files — no separate parcel-polygon fetch needed like
+Seattle's, since Building Footprints already carries its own BBL.
+
+| Dataset | Socrata ID | Endpoint |
+|---|---|---|
+| Building Footprints (geometry, BIN, BBL, height_roof, construction_year, name) | `5zhs-2jue` | `https://data.cityofnewyork.us/resource/5zhs-2jue.json` |
+| PLUTO (numfloors, yearbuilt, ownername, address, bbl) | `64uk-42ks` | `https://data.cityofnewyork.us/resource/64uk-42ks.json` |
+
+Scoped to Manhattan per the M3 DoD ("switching to NYC identifies Manhattan
+buildings"): Building Footprints filtered with `within_box(the_geom, ...)`
+on a Manhattan bounding box (140,250 rows); PLUTO filtered with `borough=MN`
+(42,544 rows). Found via the Socrata catalog API
+(`api.us.socrata.com/api/catalog/v1?domains=data.cityofnewyork.us&q=...`)
+rather than guessing dataset ids from search results, since NYC Open Data
+has several similarly-named building/PLUTO datasets (PLUTO Change File,
+MapPLUTO, BUILDING_HISTORIC, ...) and the wrong one silently gives an
+incomplete or stale join.
+
+Join key: Building Footprints' `mappluto_bbl` (10-digit string) equals
+`str(int(float(pluto.bbl)))` — PLUTO's `bbl` comes back from the API as a
+numeric string with trailing decimals (`"1015590019.00000000"`).
+
+Unlike Seattle, height is real (LiDAR-derived `height_roof`, not a
+floors×3.5 estimate) and owner is real (PLUTO's `ownername` isn't redacted).
+`name` is populated for ~0.8% of footprints and is generally high quality
+(landmarks, named buildings) with a small amount of junk (bare numbers,
+short codes) filtered out — see `_is_bad_name` in `cities/nyc.py`.
+
