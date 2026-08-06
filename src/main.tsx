@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ThemeProvider } from '@coinbase/cds-web/system';
 import { defaultTheme } from '@coinbase/cds-web/themes/defaultTheme';
+import '@coinbase/cds-icons/fonts/web/icon-font.css';
 import { initMapMode } from './map/mapMode';
 import { ArModeController } from './ar/arMode';
 import { App } from './ui/App';
