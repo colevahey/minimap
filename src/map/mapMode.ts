@@ -87,9 +87,12 @@ export type MapModeListener = (state: MapModeState) => void;
 
 /**
  * Owns the MapLibre instance, the pose pipeline, and the ray/highlight/identify
- * loop for map mode (§7). React (src/ui/App.tsx) only ever reads state via
- * `onUpdate` and issues commands (`useMyLocation`, `useCompass`, ...) — it never
- * touches the map or pose internals directly.
+ * loop for map mode (§7). Both `map` and `pose` are also read directly by
+ * ArModeController (src/ar/arMode.ts, constructed with a reference to this
+ * controller) — position/heading/city stay unified across a mode switch.
+ * React (src/ui/App.tsx) only ever reads state via `onUpdate` and issues pose
+ * commands through `controller.pose`/`switchCity` — it never touches MapLibre
+ * or the pose internals directly.
  */
 export class MapModeController {
   readonly map: maplibregl.Map;
@@ -272,22 +275,6 @@ export class MapModeController {
     // gap is a multi-second detour, not a nice touch, for what's really just
     // a city switch.
     this.map.jumpTo({ center: config.center, zoom: 15.5 });
-  }
-
-  useMyLocation(): void {
-    this.pose.startGeolocation();
-  }
-
-  useCompass(): Promise<'granted' | 'denied' | 'unsupported'> {
-    return this.pose.startCompass();
-  }
-
-  setManualHeading(headingDeg: number): void {
-    this.pose.setManualHeading(headingDeg);
-  }
-
-  setManualHeadingOffset(offsetDeg: number): void {
-    this.pose.setManualHeadingOffset(offsetDeg);
   }
 }
 

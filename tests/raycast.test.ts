@@ -1,13 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { toGeo, toLocal } from '../src/core/geo';
-import { raycast } from '../src/core/raycast';
+import { raycast, raycastWithPitch } from '../src/core/raycast';
 import type { BuildingWithRing, LngLat } from '../src/core/types';
 
 const observer: LngLat = { lat: 47.606, lng: -122.333 };
 
-/** A 40m square footprint centred at local metres (cx, cy) around the observer. */
-function squareBuilding(id: string, cx: number, cy: number): BuildingWithRing {
-  const half = 20;
+/** A square footprint centred at local metres (cx, cy) around the observer. */
+function squareBuilding(
+  id: string,
+  cx: number,
+  cy: number,
+  opts: { half?: number; height_m?: number; floors?: number } = {},
+): BuildingWithRing {
+  const half = opts.half ?? 20;
   const corners: [number, number][] = [
     [cx - half, cy - half],
     [cx + half, cy - half],
@@ -18,7 +23,14 @@ function squareBuilding(id: string, cx: number, cy: number): BuildingWithRing {
     const [lat, lng] = toGeo(x, y, observer);
     return [lng, lat] as [number, number];
   });
-  return { id, city: 'sea', source: 'test-fixture', ring };
+  return {
+    id,
+    city: 'sea',
+    source: 'test-fixture',
+    ring,
+    height_m: opts.height_m,
+    floors: opts.floors,
+  };
 }
 
 describe('raycast (§5 test vectors)', () => {
@@ -46,6 +58,46 @@ describe('raycast (§5 test vectors)', () => {
 
   it('45° hits nothing (both buildings off-axis)', () => {
     expect(raycast(observer, 45, buildings)).toBeNull();
+  });
+});
+
+describe('raycastWithPitch (§8 height-occlusion)', () => {
+  // A short building 40m north (roofline ≈ atan2(18.4, 40) ≈ 24.7°) directly
+  // in front of a much taller one 300m north (roofline ≈ atan2(198.4, 290) ≈
+  // 34.4°) — looking up over the short building's roof should reveal the tall
+  // one behind it, exactly the M4 DoD scenario ("aiming up at a tall tower
+  // behind a low building selects the tower").
+  const short = squareBuilding('short', 0, 50, { half: 10, height_m: 20 });
+  const tall = squareBuilding('tall', 0, 300, { half: 10, height_m: 200 });
+  const buildings = [short, tall];
+
+  it('level pitch selects the near short building', () => {
+    const hit = raycastWithPitch(observer, 0, 0, buildings);
+    expect(hit?.b.id).toBe('short');
+  });
+
+  it('pitching up past the short building\'s roofline selects the tall building behind it', () => {
+    const hit = raycastWithPitch(observer, 0, 30, buildings);
+    expect(hit?.b.id).toBe('tall');
+  });
+
+  it('pitching up past both rooflines hits nothing', () => {
+    expect(raycastWithPitch(observer, 0, 80, buildings)).toBeNull();
+  });
+
+  it('falls back to flat first-intersection when height data is missing', () => {
+    const noHeight = squareBuilding('no-height', 0, 50, { half: 10 });
+    const hit = raycastWithPitch(observer, 0, 45, [noHeight]);
+    expect(hit?.b.id).toBe('no-height');
+  });
+
+  it('uses floors × 3.5m when height_m is absent but floors is present', () => {
+    // 6 floors × 3.5 = 21m, close to the 20m explicit-height case above.
+    const byFloors = squareBuilding('by-floors', 0, 50, { half: 10, floors: 6 });
+    const hitLevel = raycastWithPitch(observer, 0, 0, [byFloors]);
+    expect(hitLevel?.b.id).toBe('by-floors');
+    const hitTooHigh = raycastWithPitch(observer, 0, 60, [byFloors]);
+    expect(hitTooHigh).toBeNull();
   });
 });
 

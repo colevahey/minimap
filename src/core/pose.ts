@@ -73,6 +73,30 @@ export function headingFromOrientationEvent(
   return null;
 }
 
+/**
+ * Elevation of the device's camera-pointing direction above horizontal, for
+ * §8's AR height-occlusion. This is the common single-axis approximation
+ * lightweight AR overlays use (screen-angle-aware beta/gamma), not a full
+ * device-orientation quaternion — only verified for upright portrait; the
+ * other three screen orientations are best-effort and worth re-checking on
+ * a real device.
+ */
+export function pitchFromOrientationEvent(event: DeviceOrientationEvent): number | null {
+  if (event.beta === null) return null;
+  const angle = screenAngle();
+  let pitch: number;
+  if (angle === 90) {
+    pitch = event.gamma === null ? 0 : -event.gamma;
+  } else if (angle === -90 || angle === 270) {
+    pitch = event.gamma === null ? 0 : event.gamma;
+  } else if (angle === 180) {
+    pitch = -(event.beta + 90);
+  } else {
+    pitch = event.beta - 90;
+  }
+  return Math.max(-90, Math.min(90, pitch));
+}
+
 export class PoseManager {
   private readonly pose: Pose = {
     position: null,
@@ -124,6 +148,12 @@ export class PoseManager {
     this.manualOffsetDeg = offsetDeg;
   }
 
+  /** No-sensor / desktop-testing fallback for AR's §8 height-occlusion pitch. */
+  setManualPitch(pitchDeg: number): void {
+    this.pose.pitchDeg = Math.max(-90, Math.min(90, pitchDeg));
+    this.emit();
+  }
+
   startGeolocation(): void {
     if (this.watchId !== null || !('geolocation' in navigator)) return;
     this.watchId = navigator.geolocation.watchPosition(
@@ -154,14 +184,22 @@ export class PoseManager {
       requestAnimationFrame(() => {
         this.rafPending = false;
         if (!this.latestEvent) return;
+
+        // Independent axes — a bad/missing heading reading shouldn't drop a
+        // good pitch reading (needed for §8 AR height-occlusion) or vice versa.
+        const pitch = pitchFromOrientationEvent(this.latestEvent);
+        if (pitch !== null) this.pose.pitchDeg = pitch;
+
         const raw = headingFromOrientationEvent(this.latestEvent);
-        if (raw === null) return;
-        const smoothed = this.smoother.push(raw);
-        this.pose.headingDeg = ((smoothed + this.manualOffsetDeg) % 360 + 360) % 360;
-        this.pose.headingSource = 'compass';
-        const accuracy = (this.latestEvent as { webkitCompassAccuracy?: number }).webkitCompassAccuracy;
-        this.pose.headingAccuracyDeg = typeof accuracy === 'number' ? accuracy : null;
-        this.emit();
+        if (raw !== null) {
+          const smoothed = this.smoother.push(raw);
+          this.pose.headingDeg = ((smoothed + this.manualOffsetDeg) % 360 + 360) % 360;
+          this.pose.headingSource = 'compass';
+          const accuracy = (this.latestEvent as { webkitCompassAccuracy?: number }).webkitCompassAccuracy;
+          this.pose.headingAccuracyDeg = typeof accuracy === 'number' ? accuracy : null;
+        }
+
+        if (pitch !== null || raw !== null) this.emit();
       });
     };
     window.addEventListener('deviceorientationabsolute', handler as EventListener);
