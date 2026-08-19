@@ -35,6 +35,21 @@ Building tiles additionally requires the `tippecanoe` and `pmtiles` CLIs
 (`brew install tippecanoe`, https://github.com/protomaps/go-pmtiles) — see
 `pipeline/build_tiles.sh`.
 
+## Deploying
+
+Live at https://colevahey.github.io/minimap/.
+
+Pushes to `main` auto-deploy the *client* (`.github/workflows/deploy.yml`) —
+tile data isn't rebuilt in CI (that means re-downloading from King County/NYC
+Open Data and redoing the pipeline joins, not a "ship a UI change" cost), it's
+carried forward from whatever's already live. When the pipeline itself
+changes and tiles need to be regenerated, rebuild them locally
+(`pipeline/build_tiles.sh`, see above) and run:
+
+```
+npm run deploy:pages
+```
+
 ## Attribution
 
 Basemap © [OpenFreeMap](https://openfreemap.org) / OpenStreetMap contributors

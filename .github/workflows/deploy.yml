@@ -18,8 +18,41 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
-      # Tile build + GitHub Pages deploy land in a later milestone once
-      # pipeline/cities/{seattle,nyc}.py produce real data (§10 M1/M3).
+
+  # Auto-deploys the *client* to GitHub Pages on every push to main. Tile
+  # data (public/tiles/*.pmtiles) is not rebuilt here — it's carried forward
+  # from whatever's already live on gh-pages, since regenerating it means
+  # re-downloading from King County/NYC Open Data and redoing the pipeline
+  # joins (minutes, and a dependency on those services being up), not a
+  # normal "ship this UI change" cost. Rebuild tiles with a manual
+  # `npm run deploy:pages` locally when the pipeline itself changes.
+  deploy:
+    needs: client
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Carry forward existing tiles from gh-pages
+        run: |
+          git fetch origin gh-pages
+          mkdir -p public/tiles
+          for city in sea nyc; do
+            git show origin/gh-pages:tiles/$city.pmtiles > public/tiles/$city.pmtiles 2>/dev/null \
+              && echo "carried forward $city.pmtiles" \
+              || echo "no existing $city.pmtiles on gh-pages yet — skipping"
+          done
+      - run: npm run build:pages
+      - uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
 
   pipeline:
     runs-on: ubuntu-latest
