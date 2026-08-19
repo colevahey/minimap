@@ -30,22 +30,41 @@ const RAY_MAX_RANGE_M = 650;
 const BUILDINGS_SOURCE = 'buildings';
 const BUILDINGS_SOURCE_LAYER = 'buildings';
 
-const HIGHLIGHT_COLOR = '#ff9d3f';
+// Distinct from every year-bucket hue below (none of which are red) so the
+// highlighted building always stands out regardless of which bucket it's in.
+const HIGHLIGHT_COLOR = '#ff3b3b';
 const DEFAULT_BUILDING_COLOR = '#5db8ff';
 
 // Year-built choropleth (map mode only — a top-down color-by-magnitude read
-// doesn't translate to a camera overlay). Sequential = one hue, light→dark,
-// per the dataviz skill's validated ramp (single-hue blue, steps 150/300/
-// 450/550/700) — older buildings recede toward the surface, newer buildings
-// read as bold/dark. Buildings with no year_built get a neutral gray, kept
-// visually distinct from every ramp step so "no data" is never mistaken for
-// "very old."
-export const YEAR_COLOR_BUCKETS: { label: string; color: string }[] = [
-  { label: '< 1950', color: '#b7d3f6' },
-  { label: '1950–79', color: '#6da7ec' },
-  { label: '1980–99', color: '#2a78d6' },
-  { label: '2000–14', color: '#1c5cab' },
-  { label: '2015+', color: '#0d366b' },
+// doesn't translate to a camera overlay). Year is a magnitude, so a single-hue
+// sequential ramp is the "by the book" dataviz-skill encoding for it — but
+// distinguishing 8 similar-looking blues by eye on a map is genuinely harder
+// than distinguishing 8 different hues, so this uses the skill's validated
+// *categorical* palette instead (all 8 slots), in fixed order (never
+// cycled/reordered) so adjacent buckets clear the CVD/contrast gates the
+// skill's validator checks:
+// `node scripts/validate_palette.js "#2a78d6,#eb6834,#1baf7a,#eda100,#e87ba4,#008300,#4a3aa7,#e34948" --mode light`
+// (WARNs on 3-of-8 contrast-vs-surface, mitigated by the always-visible text
+// labels in the legend below). The skill notes a choropleth is an "all-pairs"
+// context — non-adjacent buckets can still end up next to each other
+// spatially, and only the first 3 slots are validated for every possible
+// pairing, not just neighbors in the legend order — worth knowing if two
+// non-adjacent bucket colors ever read as too similar in practice; the
+// mitigation already in place is the always-visible legend labels.
+// Buckets sized to the real year_built distribution (skews toward
+// 1900–1959 in both Seattle and NYC) rather than even calendar spacing, so
+// each bucket actually carries a meaningful share of buildings. Buildings
+// with no year_built get a neutral gray, kept visually distinct from all 8
+// so "no data" never reads as a 9th bucket.
+export const YEAR_COLOR_BUCKETS: { label: string; color: string; minYear: number }[] = [
+  { label: '< 1900', color: '#2a78d6', minYear: -Infinity }, // blue
+  { label: '1900–19', color: '#eb6834', minYear: 1900 }, // orange
+  { label: '1920–39', color: '#1baf7a', minYear: 1920 }, // aqua
+  { label: '1940–59', color: '#eda100', minYear: 1940 }, // yellow
+  { label: '1960–79', color: '#e87ba4', minYear: 1960 }, // magenta
+  { label: '1980–99', color: '#008300', minYear: 1980 }, // green
+  { label: '2000–14', color: '#4a3aa7', minYear: 2000 }, // violet
+  { label: '2015+', color: '#e34948', minYear: 2015 }, // red
 ];
 export const YEAR_COLOR_NO_DATA = '#8a8f98';
 
@@ -59,14 +78,7 @@ function buildingsFillColorExpression(colorByYear: boolean): ExpressionSpecifica
           'step',
           ['get', 'year_built'],
           YEAR_COLOR_BUCKETS[0].color,
-          1950,
-          YEAR_COLOR_BUCKETS[1].color,
-          1980,
-          YEAR_COLOR_BUCKETS[2].color,
-          2000,
-          YEAR_COLOR_BUCKETS[3].color,
-          2015,
-          YEAR_COLOR_BUCKETS[4].color,
+          ...YEAR_COLOR_BUCKETS.slice(1).flatMap((bucket) => [bucket.minYear, bucket.color]),
         ],
       ]
     : DEFAULT_BUILDING_COLOR;

@@ -16,12 +16,27 @@ interface AppProps {
   arContainer: HTMLElement;
 }
 
-function CollapseToggle({ expanded, onClick, label }: { expanded: boolean; onClick: () => void; label: string }) {
+function CollapseToggle({
+  expanded,
+  onClick,
+  label,
+  expandDirection,
+}: {
+  expanded: boolean;
+  onClick: () => void;
+  label: string;
+  /** Which way this panel's content grows when expanded — down for a panel
+   * anchored to the top edge, up for one anchored to the bottom edge. */
+  expandDirection: 'down' | 'up';
+}) {
+  // Collapsed: points left, back at the label it's attached to. Expanded:
+  // points toward where the revealed content now sits.
+  const expandedIcon = expandDirection === 'down' ? 'arrowDown' : 'arrowUp';
   return (
     <IconButton
       size="s"
       variant="tertiary"
-      name={expanded ? 'arrowUp' : 'arrowDown'}
+      name={expanded ? expandedIcon : 'arrowLeft'}
       accessibilityLabel={label}
       onClick={onClick}
     />
@@ -119,6 +134,7 @@ export function App({ controller, arController, mapContainer, arContainer }: App
               expanded={controlsExpanded}
               onClick={() => setControlsExpanded((v) => !v)}
               label={controlsExpanded ? 'Collapse controls' : 'Expand controls'}
+              expandDirection="down"
             />
           </HStack>
 
@@ -153,25 +169,22 @@ export function App({ controller, arController, mapContainer, arContainer }: App
                     Color by year built
                   </Button>
                   {colorByYear && (
-                    <HStack gap={1} style={{ flexWrap: 'wrap', alignItems: 'center' }}>
-                      {YEAR_COLOR_BUCKETS.map((bucket) => (
+                    // Fixed 4-column grid, not flex-wrap — a predictable compact
+                    // block (2 short rows) regardless of viewport width, instead
+                    // of an unpredictable wrap of 9 variable-width chips.
+                    <Box style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '4px 6px' }}>
+                      {[...YEAR_COLOR_BUCKETS, { label: 'no data', color: YEAR_COLOR_NO_DATA }].map((bucket) => (
                         <HStack key={bucket.label} gap={0.25} style={{ alignItems: 'center' }}>
-                          <Box borderRadius={100} style={{ width: 10, height: 10, backgroundColor: bucket.color }} />
-                          <Text font="legal" color="fgMuted">
+                          <Box
+                            borderRadius={100}
+                            style={{ width: 8, height: 8, flexShrink: 0, backgroundColor: bucket.color }}
+                          />
+                          <Text font="legal" color="fgMuted" style={{ whiteSpace: 'nowrap' }}>
                             {bucket.label}
                           </Text>
                         </HStack>
                       ))}
-                      <HStack gap={0.25} style={{ alignItems: 'center' }}>
-                        <Box
-                          borderRadius={100}
-                          style={{ width: 10, height: 10, backgroundColor: YEAR_COLOR_NO_DATA }}
-                        />
-                        <Text font="legal" color="fgMuted">
-                          no data
-                        </Text>
-                      </HStack>
-                    </HStack>
+                    </Box>
                   )}
                 </VStack>
               )}
@@ -307,6 +320,7 @@ export function App({ controller, arController, mapContainer, arContainer }: App
                     expanded={panelExpanded}
                     onClick={() => setPanelExpanded((v) => !v)}
                     label={panelExpanded ? 'Collapse details' : 'Expand details'}
+                    expandDirection="up"
                   />
                 )}
               </HStack>
