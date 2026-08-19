@@ -15,9 +15,11 @@ interface CityConfig {
 // §10 M3: switching cities is map-mode/config-only — core/geo, core/raycast,
 // core/buildings, core/pose stay untouched, they never knew "Seattle" or "NYC"
 // in the first place.
+// Paths are relative (no leading slash) so they resolve under Vite's `base`
+// (e.g. "/minimap/" on GitHub Pages) instead of escaping back to the origin root.
 const CITY_CONFIG: Record<CityCode, CityConfig> = {
-  sea: { center: [-122.3321, 47.6062], pmtilesPath: '/tiles/sea.pmtiles' }, // downtown Seattle
-  nyc: { center: [-73.9857, 40.7484], pmtilesPath: '/tiles/nyc.pmtiles' }, // Empire State Building, Manhattan
+  sea: { center: [-122.3321, 47.6062], pmtilesPath: 'tiles/sea.pmtiles' }, // downtown Seattle
+  nyc: { center: [-73.9857, 40.7484], pmtilesPath: 'tiles/nyc.pmtiles' }, // Empire State Building, Manhattan
 };
 
 // No API keys anywhere (§1): OpenFreeMap serves this style + its basemap tiles for free.
@@ -36,8 +38,11 @@ function ensurePmtilesProtocol(): void {
   protocolRegistered = true;
 }
 
-function pmtilesUrl(publicPath: string): string {
-  return `pmtiles://${new URL(publicPath, window.location.href).href}`;
+function pmtilesUrl(relativePath: string): string {
+  // import.meta.env.BASE_URL is Vite's configured `base` ("/" locally, "/minimap/"
+  // on GitHub Pages) — resolving through it keeps this correct under either.
+  const base = new URL(import.meta.env.BASE_URL, window.location.href);
+  return `pmtiles://${new URL(relativePath, base).href}`;
 }
 
 function emptyFeatureCollection(): GeoJSON.FeatureCollection {
