@@ -49,6 +49,16 @@ function CollapseToggle({
   );
 }
 
+// The top overlay has no card background (floats directly on the map/camera
+// view per request), so text needs an explicit fixed color rather than a
+// theme token — `fg` would flip to near-white in a dark system theme and
+// vanish against nothing. A soft light-colored shadow keeps it legible over
+// whatever's directly underneath (a light road, a dark 3D building, ...).
+const OVERLAY_TEXT_STYLE = { color: '#0b0b0b', textShadow: '0 1px 3px rgba(255,255,255,0.8)' };
+const OVERLAY_TEXT_MUTED_STYLE = { color: '#3a3a3a', textShadow: '0 1px 3px rgba(255,255,255,0.8)' };
+const OVERLAY_TEXT_NEGATIVE_STYLE = { color: '#cf202f', textShadow: '0 1px 3px rgba(255,255,255,0.8)' };
+const OVERLAY_TEXT_WARNING_STYLE = { color: '#b35900', textShadow: '0 1px 3px rgba(255,255,255,0.8)' };
+
 const AI_GRADIENT_KEYFRAMES = `
 @keyframes ai-glow-shift {
   0% { background-position: 0% 50%; }
@@ -79,7 +89,7 @@ function AiGlowRing({ children }: { children: React.ReactNode }) {
 function IdentifyPanelDetails({ hit }: { hit: RaycastHit }) {
   return (
     <>
-      <Text font="body" color="fgMuted">
+      <Text font="body" style={OVERLAY_TEXT_MUTED_STYLE}>
         {[
           hit.b.floors != null ? `${hit.b.floors} floors` : null,
           hit.b.height_m != null ? `~${Math.round(hit.b.height_m)} m` : null,
@@ -88,11 +98,11 @@ function IdentifyPanelDetails({ hit }: { hit: RaycastHit }) {
           .filter(Boolean)
           .join(' · ') || 'No attribute data for this building'}
       </Text>
-      <Text font="caption" color="fgMuted">
+      <Text font="caption" style={OVERLAY_TEXT_MUTED_STYLE}>
         {hit.b.owner ? `Registered owner: ${hit.b.owner}` : 'Registered owner: unavailable'} · {Math.round(hit.t)} m
         away
       </Text>
-      <Text font="legal" color="fgMuted">
+      <Text font="legal" style={OVERLAY_TEXT_MUTED_STYLE}>
         {hit.b.source}
       </Text>
     </>
@@ -154,16 +164,9 @@ export function App({ controller, arController, mapContainer, arContainer }: App
     <>
       <style>{AI_GRADIENT_KEYFRAMES}</style>
       <Box position="absolute" top={0} left={0} right={0} padding={3} style={{ pointerEvents: 'none' }}>
-        <VStack
-          gap={2}
-          background="bg"
-          borderRadius={400}
-          padding={3}
-          elevation={2}
-          style={{ pointerEvents: 'auto', maxWidth: 360 }}
-        >
+        <VStack gap={2} style={{ pointerEvents: 'auto', maxWidth: 360 }}>
           <HStack gap={2} style={{ alignItems: 'center', justifyContent: 'space-between' }}>
-            <Text as="h1" font="title3">
+            <Text as="h1" font="title3" style={OVERLAY_TEXT_STYLE}>
               Minimap
             </Text>
             <CollapseToggle
@@ -180,13 +183,14 @@ export function App({ controller, arController, mapContainer, arContainer }: App
             </Button>
 
             {(() => {
+              // Label shows the DESTINATION, not the current mode: "AR" while
+              // in map mode (tap to switch to AR), "Map" while in AR mode.
               const modeToggle = (
                 <Button size="xs" variant="secondary" onClick={() => setMode(mode === 'map' ? 'ar' : 'map')}>
-                  {mode === 'map' ? 'Map' : 'AR'}
+                  {mode === 'map' ? 'AR' : 'Map'}
                 </Button>
               );
-              // Glows when tapping switches you INTO AR (i.e. currently in map
-              // mode) — the AI-feature invitation, not a "you are here" badge.
+              // Glows when the destination is AR — the AI-feature invitation.
               return mode === 'map' ? <AiGlowRing>{modeToggle}</AiGlowRing> : modeToggle;
             })()}
 
@@ -266,7 +270,7 @@ export function App({ controller, arController, mapContainer, arContainer }: App
               {[...YEAR_COLOR_BUCKETS, { label: 'no data', color: YEAR_COLOR_NO_DATA }].map((bucket) => (
                 <HStack key={bucket.label} gap={0.25} style={{ alignItems: 'center' }}>
                   <Box borderRadius={100} style={{ width: 8, height: 8, flexShrink: 0, backgroundColor: bucket.color }} />
-                  <Text font="legal" color="fgMuted" style={{ whiteSpace: 'nowrap' }}>
+                  <Text font="legal" style={{ ...OVERLAY_TEXT_MUTED_STYLE, whiteSpace: 'nowrap' }}>
                     {bucket.label}
                   </Text>
                 </HStack>
@@ -277,23 +281,23 @@ export function App({ controller, arController, mapContainer, arContainer }: App
           {moreInfoExpanded && (
             <>
               {compassStatus === 'denied' && (
-                <Text font="caption" color="fgNegative">
+                <Text font="caption" style={OVERLAY_TEXT_NEGATIVE_STYLE}>
                   Compass permission denied — use the heading slider below.
                 </Text>
               )}
               {compassStatus === 'unsupported' && (
-                <Text font="caption" color="fgMuted">
+                <Text font="caption" style={OVERLAY_TEXT_MUTED_STYLE}>
                   No compass sensor on this device — use the heading slider below.
                 </Text>
               )}
               {poorAccuracy && (
-                <Text font="caption" color="fgWarning">
+                <Text font="caption" style={OVERLAY_TEXT_WARNING_STYLE}>
                   Compass accuracy is poor — figure-8 the phone to calibrate.
                 </Text>
               )}
 
               <VStack gap={0.5}>
-                <Text font="caption" color="fgMuted">
+                <Text font="caption" style={OVERLAY_TEXT_MUTED_STYLE}>
                   Heading {pose.headingDeg !== null ? `${Math.round(pose.headingDeg)}°` : 'unset'}
                 </Text>
                 <input
@@ -309,7 +313,7 @@ export function App({ controller, arController, mapContainer, arContainer }: App
 
               {pose.headingSource === 'compass' && (
                 <VStack gap={0.5}>
-                  <Text font="caption" color="fgMuted">
+                  <Text font="caption" style={OVERLAY_TEXT_MUTED_STYLE}>
                     Heading offset nudge
                   </Text>
                   <input
@@ -326,7 +330,7 @@ export function App({ controller, arController, mapContainer, arContainer }: App
 
               {mode === 'ar' && (
                 <VStack gap={0.5}>
-                  <Text font="caption" color="fgMuted">
+                  <Text font="caption" style={OVERLAY_TEXT_MUTED_STYLE}>
                     Pitch (§8 height-occlusion) {pose.pitchDeg !== null ? `${Math.round(pose.pitchDeg)}°` : 'unset'}
                   </Text>
                   <input
@@ -348,20 +352,22 @@ export function App({ controller, arController, mapContainer, arContainer }: App
       <Box position="absolute" bottom={0} left={0} right={0} padding={3} style={{ pointerEvents: 'none' }}>
         <VStack
           gap={1}
-          background="bg"
           borderRadius={400}
           padding={3}
-          elevation={2}
-          style={{ pointerEvents: 'auto' }}
+          // Semi-opaque, not the fully solid "bg" token — the map/camera
+          // stays faintly visible through it, and it doesn't need a
+          // separate dark-mode variant since it's an explicit color, not a
+          // theme token.
+          style={{ pointerEvents: 'auto', backgroundColor: 'rgba(255,255,255,0.72)', backdropFilter: 'blur(6px)' }}
         >
           {mode === 'ar' && arState.cameraStatus === 'starting' && (
-            <Text font="body" color="fgMuted">
+            <Text font="body" style={OVERLAY_TEXT_MUTED_STYLE}>
               Starting camera…
             </Text>
           )}
           {mode === 'ar' && arState.cameraStatus === 'denied' && (
             <>
-              <Text font="body" color="fgNegative">
+              <Text font="body" style={OVERLAY_TEXT_NEGATIVE_STYLE}>
                 Camera permission denied.
               </Text>
               <Button size="s" variant="secondary" onClick={() => setMode('map')}>
@@ -371,7 +377,7 @@ export function App({ controller, arController, mapContainer, arContainer }: App
           )}
           {mode === 'ar' && arState.cameraStatus === 'unsupported' && (
             <>
-              <Text font="body" color="fgMuted">
+              <Text font="body" style={OVERLAY_TEXT_MUTED_STYLE}>
                 Camera not supported on this device.
               </Text>
               <Button size="s" variant="secondary" onClick={() => setMode('map')}>
@@ -382,7 +388,7 @@ export function App({ controller, arController, mapContainer, arContainer }: App
           {(mode === 'map' || arState.cameraStatus === 'active') && (
             <>
               <HStack gap={1} style={{ alignItems: 'center', justifyContent: 'space-between' }}>
-                <Text as="h2" font="title3" style={{ flex: 1 }}>
+                <Text as="h2" font="title3" style={{ ...OVERLAY_TEXT_STYLE, flex: 1 }}>
                   {hit ? hit.b.name ?? 'Unidentified building' : 'Point at a building to identify it'}
                 </Text>
                 {showPanelDetails && (
@@ -398,7 +404,7 @@ export function App({ controller, arController, mapContainer, arContainer }: App
             </>
           )}
           {mode === 'ar' && arState.cameraStatus === 'active' && (
-            <Text font="legal" color="fgMuted">
+            <Text font="legal" style={OVERLAY_TEXT_MUTED_STYLE}>
               {arState.locked ? 'Locked — tap the camera to release' : 'Tap the camera to lock this building'}
             </Text>
           )}
