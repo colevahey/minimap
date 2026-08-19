@@ -125,9 +125,10 @@ export function App({ controller, arController, mapContainer, arContainer }: App
     cameraStatus: 'idle',
   }));
   const [compassStatus, setCompassStatus] = useState<CompassStatus>('idle');
-  const [controlsExpanded, setControlsExpanded] = useState(false);
+  const [moreInfoExpanded, setMoreInfoExpanded] = useState(false);
   const [panelExpanded, setPanelExpanded] = useState(false);
   const [legendVisible, setLegendVisible] = useState(false);
+  const [colorPickerOpen, setColorPickerOpen] = useState(false);
 
   useEffect(() => controller.onUpdate(setMapState), [controller]);
   useEffect(() => arController.onUpdate(setArState), [arController]);
@@ -166,96 +167,115 @@ export function App({ controller, arController, mapContainer, arContainer }: App
               Minimap
             </Text>
             <CollapseToggle
-              expanded={controlsExpanded}
-              onClick={() => setControlsExpanded((v) => !v)}
-              label={controlsExpanded ? 'Collapse controls' : 'Expand controls'}
+              expanded={moreInfoExpanded}
+              onClick={() => setMoreInfoExpanded((v) => !v)}
+              label={moreInfoExpanded ? 'Less info' : 'More info'}
               expandDirection="down"
             />
           </HStack>
 
-          {controlsExpanded && (
-            <>
-              <HStack gap={2} style={{ alignItems: 'baseline', flexWrap: 'wrap' }}>
-                <HStack gap={0.5}>
-                  <Button size="xs" variant={city === 'sea' ? 'primary' : 'tertiary'} onClick={() => controller.switchCity('sea')}>
-                    Seattle
-                  </Button>
-                  <Button size="xs" variant={city === 'nyc' ? 'primary' : 'tertiary'} onClick={() => controller.switchCity('nyc')}>
-                    NYC
-                  </Button>
-                </HStack>
-                <HStack gap={0.5}>
-                  <Button size="xs" variant={mode === 'map' ? 'primary' : 'tertiary'} onClick={() => setMode('map')}>
-                    Map
-                  </Button>
-                  <AiGlowRing>
-                    <Button size="xs" variant={mode === 'ar' ? 'primary' : 'tertiary'} onClick={() => setMode('ar')}>
-                      AR
-                    </Button>
-                  </AiGlowRing>
-                </HStack>
-              </HStack>
+          <HStack gap={1} style={{ alignItems: 'center', flexWrap: 'wrap' }}>
+            <Button size="xs" variant="secondary" onClick={() => controller.switchCity(city === 'sea' ? 'nyc' : 'sea')}>
+              {city === 'sea' ? 'SEA' : 'NYC'}
+            </Button>
 
-              {mode === 'map' && (
-                <VStack gap={0.5}>
-                  <HStack gap={0.5} style={{ alignItems: 'center' }}>
+            {(() => {
+              const modeToggle = (
+                <Button size="xs" variant="secondary" onClick={() => setMode(mode === 'map' ? 'ar' : 'map')}>
+                  {mode === 'map' ? 'Map' : 'AR'}
+                </Button>
+              );
+              // Glows when tapping switches you INTO AR (i.e. currently in map
+              // mode) — the AI-feature invitation, not a "you are here" badge.
+              return mode === 'map' ? <AiGlowRing>{modeToggle}</AiGlowRing> : modeToggle;
+            })()}
+
+            {mode === 'map' && (
+              <Box style={{ position: 'relative' }}>
+                <Button size="xs" variant="secondary" onClick={() => setColorPickerOpen((v) => !v)}>
+                  {colorByYear ? 'Year built' : 'Default'} ▾
+                </Button>
+                {colorPickerOpen && (
+                  <VStack
+                    gap={0}
+                    background="bg"
+                    elevation={2}
+                    borderRadius={200}
+                    style={{ position: 'absolute', top: '110%', left: 0, zIndex: 10, minWidth: 130, overflow: 'hidden' }}
+                  >
+                    <Button
+                      size="xs"
+                      variant={!colorByYear ? 'primary' : 'tertiary'}
+                      onClick={() => {
+                        controller.setColorByYear(false);
+                        setColorPickerOpen(false);
+                      }}
+                      style={{ borderRadius: 0, justifyContent: 'flex-start' }}
+                    >
+                      Default
+                    </Button>
                     <Button
                       size="xs"
                       variant={colorByYear ? 'primary' : 'tertiary'}
-                      onClick={() => controller.setColorByYear(!colorByYear)}
+                      onClick={() => {
+                        controller.setColorByYear(true);
+                        setColorPickerOpen(false);
+                      }}
+                      style={{ borderRadius: 0, justifyContent: 'flex-start' }}
                     >
-                      Color by year built
+                      Year built
                     </Button>
-                    {colorByYear && (
-                      // Tap to reveal, not true CSS hover — there's no hover
-                      // state on a phone touchscreen, and a tap works on both.
-                      <IconButton
-                        size="xs"
-                        variant="tertiary"
-                        name="info"
-                        accessibilityLabel={legendVisible ? 'Hide legend' : 'Show legend'}
-                        onClick={() => setLegendVisible((v) => !v)}
-                      />
-                    )}
-                  </HStack>
-                  {colorByYear && legendVisible && (
-                    // Fixed 4-column grid, not flex-wrap — a predictable compact
-                    // block (2 short rows) regardless of viewport width, instead
-                    // of an unpredictable wrap of 9 variable-width chips.
-                    <Box style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '4px 6px' }}>
-                      {[...YEAR_COLOR_BUCKETS, { label: 'no data', color: YEAR_COLOR_NO_DATA }].map((bucket) => (
-                        <HStack key={bucket.label} gap={0.25} style={{ alignItems: 'center' }}>
-                          <Box
-                            borderRadius={100}
-                            style={{ width: 8, height: 8, flexShrink: 0, backgroundColor: bucket.color }}
-                          />
-                          <Text font="legal" color="fgMuted" style={{ whiteSpace: 'nowrap' }}>
-                            {bucket.label}
-                          </Text>
-                        </HStack>
-                      ))}
-                    </Box>
-                  )}
-                </VStack>
-              )}
+                  </VStack>
+                )}
+              </Box>
+            )}
 
-              <HStack gap={1}>
-                <IconButton
-                  size="s"
-                  variant={pose.position ? 'secondary' : 'primary'}
-                  name="location"
-                  accessibilityLabel={pose.position ? 'Location on' : 'Use my location'}
-                  onClick={() => controller.pose.startGeolocation()}
-                />
-                <IconButton
-                  size="s"
-                  variant={compassStatus === 'denied' ? 'negative' : pose.headingSource === 'compass' ? 'secondary' : 'primary'}
-                  name="compass"
-                  accessibilityLabel={pose.headingSource === 'compass' ? 'Compass on' : 'Use compass'}
-                  onClick={async () => setCompassStatus(await controller.pose.startCompass())}
-                />
-              </HStack>
+            {mode === 'map' && colorByYear && (
+              // Tap to reveal, not true CSS hover — there's no hover state on
+              // a phone touchscreen, and a tap works on both.
+              <IconButton
+                size="xs"
+                variant="tertiary"
+                name="info"
+                accessibilityLabel={legendVisible ? 'Hide legend' : 'Show legend'}
+                onClick={() => setLegendVisible((v) => !v)}
+              />
+            )}
 
+            <IconButton
+              size="s"
+              variant={pose.position ? 'secondary' : 'primary'}
+              name="location"
+              accessibilityLabel={pose.position ? 'Location on' : 'Use my location'}
+              onClick={() => controller.pose.startGeolocation()}
+            />
+            <IconButton
+              size="s"
+              variant={compassStatus === 'denied' ? 'negative' : pose.headingSource === 'compass' ? 'secondary' : 'primary'}
+              name="compass"
+              accessibilityLabel={pose.headingSource === 'compass' ? 'Compass on' : 'Use compass'}
+              onClick={async () => setCompassStatus(await controller.pose.startCompass())}
+            />
+          </HStack>
+
+          {mode === 'map' && colorByYear && legendVisible && (
+            // Fixed 4-column grid, not flex-wrap — a predictable compact
+            // block (2 short rows) regardless of viewport width, instead
+            // of an unpredictable wrap of 9 variable-width chips.
+            <Box style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '4px 6px' }}>
+              {[...YEAR_COLOR_BUCKETS, { label: 'no data', color: YEAR_COLOR_NO_DATA }].map((bucket) => (
+                <HStack key={bucket.label} gap={0.25} style={{ alignItems: 'center' }}>
+                  <Box borderRadius={100} style={{ width: 8, height: 8, flexShrink: 0, backgroundColor: bucket.color }} />
+                  <Text font="legal" color="fgMuted" style={{ whiteSpace: 'nowrap' }}>
+                    {bucket.label}
+                  </Text>
+                </HStack>
+              ))}
+            </Box>
+          )}
+
+          {moreInfoExpanded && (
+            <>
               {compassStatus === 'denied' && (
                 <Text font="caption" color="fgNegative">
                   Compass permission denied — use the heading slider below.
