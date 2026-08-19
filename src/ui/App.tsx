@@ -137,7 +137,7 @@ export function App({ controller, arController, mapContainer, arContainer }: App
   const [compassStatus, setCompassStatus] = useState<CompassStatus>('idle');
   const [moreInfoExpanded, setMoreInfoExpanded] = useState(false);
   const [panelExpanded, setPanelExpanded] = useState(false);
-  const [legendVisible, setLegendVisible] = useState(false);
+  const [legendHovered, setLegendHovered] = useState(false);
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
 
   useEffect(() => controller.onUpdate(setMapState), [controller]);
@@ -165,19 +165,11 @@ export function App({ controller, arController, mapContainer, arContainer }: App
       <style>{AI_GRADIENT_KEYFRAMES}</style>
       <Box position="absolute" top={0} left={0} right={0} padding={3} style={{ pointerEvents: 'none' }}>
         <VStack gap={2} style={{ pointerEvents: 'auto', maxWidth: 360 }}>
-          <HStack gap={2} style={{ alignItems: 'center', justifyContent: 'space-between' }}>
-            <Text as="h1" font="title3" style={OVERLAY_TEXT_STYLE}>
+          <HStack gap={1} style={{ alignItems: 'center', flexWrap: 'wrap' }}>
+            <Text as="h1" font="title3" style={{ ...OVERLAY_TEXT_STYLE, marginRight: 4 }}>
               Minimap
             </Text>
-            <CollapseToggle
-              expanded={moreInfoExpanded}
-              onClick={() => setMoreInfoExpanded((v) => !v)}
-              label={moreInfoExpanded ? 'Less info' : 'More info'}
-              expandDirection="down"
-            />
-          </HStack>
 
-          <HStack gap={1} style={{ alignItems: 'center', flexWrap: 'wrap' }}>
             <Button size="xs" variant="secondary" onClick={() => controller.switchCity(city === 'sea' ? 'nyc' : 'sea')}>
               {city === 'sea' ? 'SEA' : 'NYC'}
             </Button>
@@ -195,7 +187,11 @@ export function App({ controller, arController, mapContainer, arContainer }: App
             })()}
 
             {mode === 'map' && (
-              <Box style={{ position: 'relative' }}>
+              <Box
+                style={{ position: 'relative' }}
+                onMouseEnter={() => setLegendHovered(true)}
+                onMouseLeave={() => setLegendHovered(false)}
+              >
                 <Button size="xs" variant="secondary" onClick={() => setColorPickerOpen((v) => !v)}>
                   {colorByYear ? 'Year built' : 'Default'} ▾
                 </Button>
@@ -205,7 +201,7 @@ export function App({ controller, arController, mapContainer, arContainer }: App
                     background="bg"
                     elevation={2}
                     borderRadius={200}
-                    style={{ position: 'absolute', top: '110%', left: 0, zIndex: 10, minWidth: 130, overflow: 'hidden' }}
+                    style={{ position: 'absolute', top: '110%', right: 0, zIndex: 10, minWidth: 130, overflow: 'hidden' }}
                   >
                     <Button
                       size="xs"
@@ -231,52 +227,79 @@ export function App({ controller, arController, mapContainer, arContainer }: App
                     </Button>
                   </VStack>
                 )}
+                {/* Hover tooltip, not click — only when "Year built" is the active
+                    selection, and not while the picker itself is open (avoids two
+                    popovers stacked on the same button). Note hover doesn't fire on
+                    a touchscreen the way it does with a mouse; this is desktop-first. */}
+                {colorByYear && legendHovered && !colorPickerOpen && (
+                  <Box
+                    background="bg"
+                    elevation={2}
+                    borderRadius={200}
+                    padding={2}
+                    style={{
+                      position: 'absolute',
+                      top: '110%',
+                      // Anchored from the right, not left — this button can sit
+                      // mid-row, and a 236px-wide tooltip extending rightward
+                      // from there clips off the edge of a phone screen.
+                      // Extending leftward instead stays inside the viewport.
+                      right: 0,
+                      zIndex: 10,
+                      display: 'grid',
+                      // minmax(0, 1fr), not bare 1fr — a bare 1fr track's
+                      // implicit minimum is its content's min-content width, so
+                      // a long label ("1900–19") silently overrides the
+                      // explicit `width` below and the grid renders wider than
+                      // intended (clipped off the edge of the screen). minmax(0, …)
+                      // lets tracks actually shrink to fit, wrapping text instead.
+                      gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+                      gap: '4px 6px',
+                      width: 236,
+                    }}
+                  >
+                    {[...YEAR_COLOR_BUCKETS, { label: 'no data', color: YEAR_COLOR_NO_DATA }].map((bucket) => (
+                      <HStack key={bucket.label} gap={0.25} style={{ alignItems: 'center', minWidth: 0 }}>
+                        <Box
+                          borderRadius={100}
+                          style={{ width: 8, height: 8, flexShrink: 0, backgroundColor: bucket.color }}
+                        />
+                        <Text font="legal" color="fgMuted" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {bucket.label}
+                        </Text>
+                      </HStack>
+                    ))}
+                  </Box>
+                )}
               </Box>
             )}
 
-            {mode === 'map' && colorByYear && (
-              // Tap to reveal, not true CSS hover — there's no hover state on
-              // a phone touchscreen, and a tap works on both.
-              <IconButton
-                size="xs"
-                variant="tertiary"
-                name="info"
-                accessibilityLabel={legendVisible ? 'Hide legend' : 'Show legend'}
-                onClick={() => setLegendVisible((v) => !v)}
-              />
-            )}
-
             <IconButton
-              size="s"
+              size="xs"
               variant={pose.position ? 'secondary' : 'primary'}
               name="location"
               accessibilityLabel={pose.position ? 'Location on' : 'Use my location'}
               onClick={() => controller.pose.startGeolocation()}
             />
             <IconButton
-              size="s"
+              size="xs"
               variant={compassStatus === 'denied' ? 'negative' : pose.headingSource === 'compass' ? 'secondary' : 'primary'}
               name="compass"
               accessibilityLabel={pose.headingSource === 'compass' ? 'Compass on' : 'Use compass'}
               onClick={async () => setCompassStatus(await controller.pose.startCompass())}
             />
-          </HStack>
 
-          {mode === 'map' && colorByYear && legendVisible && (
-            // Fixed 4-column grid, not flex-wrap — a predictable compact
-            // block (2 short rows) regardless of viewport width, instead
-            // of an unpredictable wrap of 9 variable-width chips.
-            <Box style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '4px 6px' }}>
-              {[...YEAR_COLOR_BUCKETS, { label: 'no data', color: YEAR_COLOR_NO_DATA }].map((bucket) => (
-                <HStack key={bucket.label} gap={0.25} style={{ alignItems: 'center' }}>
-                  <Box borderRadius={100} style={{ width: 8, height: 8, flexShrink: 0, backgroundColor: bucket.color }} />
-                  <Text font="legal" style={{ ...OVERLAY_TEXT_MUTED_STYLE, whiteSpace: 'nowrap' }}>
-                    {bucket.label}
-                  </Text>
-                </HStack>
-              ))}
-            </Box>
-          )}
+            {/* Reveals the heading/pitch sliders and compass status — "info"
+                fits what this actually shows now that these controls live in a
+                single row instead of a card the arrow used to expand downward. */}
+            <IconButton
+              size="xs"
+              variant="tertiary"
+              name="info"
+              accessibilityLabel={moreInfoExpanded ? 'Hide sensor info' : 'Show sensor info'}
+              onClick={() => setMoreInfoExpanded((v) => !v)}
+            />
+          </HStack>
 
           {moreInfoExpanded && (
             <>
