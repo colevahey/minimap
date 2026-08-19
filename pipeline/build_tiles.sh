@@ -20,15 +20,21 @@ mbtiles="$outdir/${city}.mbtiles"
 pmtiles_out="$outdir/${city}.pmtiles"
 
 # z14-17 carry full footprints (§4): buildings must not be dropped/simplified
-# away at the zoom the client queries.
+# away at the zoom the client queries there. Also generate z10-13 (city-wide
+# views) so buildings don't vanish entirely when the map is zoomed out — the
+# client fades fill-extrusion-height to 0 below z14 (map mode only) so those
+# zooms render flat/2D rather than a chaotic wall of tiny 3D extrusions.
+# Tippecanoe's default feature-dropping (no --no-feature-limit/--no-tile-size-limit
+# this time) only actually engages at z10-13, where a tile covers enough area
+# to hit the size limit — z14-17 tiles are small enough that nothing gets
+# dropped there in practice, preserving the "no footprints dropped" guarantee
+# for the zoom the client actually raycasts/identifies against.
 tippecanoe \
   --output="$mbtiles" \
   --force \
   --layer=buildings \
-  --minimum-zoom=14 \
+  --minimum-zoom=10 \
   --maximum-zoom=17 \
-  --no-feature-limit \
-  --no-tile-size-limit \
   "$input"
 
 pmtiles convert "$mbtiles" "$pmtiles_out"

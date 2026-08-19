@@ -29,17 +29,50 @@ function CollapseToggle({
    * anchored to the top edge, up for one anchored to the bottom edge. */
   expandDirection: 'down' | 'up';
 }) {
-  // Collapsed: points left, back at the label it's attached to. Expanded:
-  // points toward where the revealed content now sits.
-  const expandedIcon = expandDirection === 'down' ? 'arrowDown' : 'arrowUp';
+  // A single glyph (arrowDown), rotated with CSS, rather than picking a
+  // different icon name per direction — arrowLeft in this icon font is
+  // drawn in a visibly different style (solid triangle head) from
+  // arrowUp/arrowDown (clean converging lines), so mixing icon names made
+  // the two states look inconsistent. Rotating one glyph guarantees they
+  // always match.
+  // down=0deg, left=90deg (clockwise), up=180deg.
+  const rotationDeg = expanded ? (expandDirection === 'down' ? 0 : 180) : 90;
   return (
     <IconButton
       size="s"
       variant="tertiary"
-      name={expanded ? expandedIcon : 'arrowLeft'}
+      name="arrowDown"
       accessibilityLabel={label}
       onClick={onClick}
+      style={{ transform: `rotate(${rotationDeg}deg)` }}
     />
+  );
+}
+
+const AI_GRADIENT_KEYFRAMES = `
+@keyframes ai-glow-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+`;
+
+/** Wraps a control in a shifting rainbow-gradient ring — the "AI feature"
+ * visual shorthand (Gemini/Copilot-style) marking AR as the vision-powered mode. */
+function AiGlowRing({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        display: 'inline-block',
+        borderRadius: 9999,
+        padding: 2,
+        background: 'linear-gradient(90deg, #4285f4, #9b72cb, #ee5a6f, #f2a93b, #4285f4)',
+        backgroundSize: '300% 100%',
+        animation: 'ai-glow-shift 4s ease infinite',
+      }}
+    >
+      {children}
+    </div>
   );
 }
 
@@ -94,6 +127,7 @@ export function App({ controller, arController, mapContainer, arContainer }: App
   const [compassStatus, setCompassStatus] = useState<CompassStatus>('idle');
   const [controlsExpanded, setControlsExpanded] = useState(false);
   const [panelExpanded, setPanelExpanded] = useState(false);
+  const [legendVisible, setLegendVisible] = useState(false);
 
   useEffect(() => controller.onUpdate(setMapState), [controller]);
   useEffect(() => arController.onUpdate(setArState), [arController]);
@@ -117,6 +151,7 @@ export function App({ controller, arController, mapContainer, arContainer }: App
 
   return (
     <>
+      <style>{AI_GRADIENT_KEYFRAMES}</style>
       <Box position="absolute" top={0} left={0} right={0} padding={3} style={{ pointerEvents: 'none' }}>
         <VStack
           gap={2}
@@ -153,22 +188,37 @@ export function App({ controller, arController, mapContainer, arContainer }: App
                   <Button size="xs" variant={mode === 'map' ? 'primary' : 'tertiary'} onClick={() => setMode('map')}>
                     Map
                   </Button>
-                  <Button size="xs" variant={mode === 'ar' ? 'primary' : 'tertiary'} onClick={() => setMode('ar')}>
-                    AR
-                  </Button>
+                  <AiGlowRing>
+                    <Button size="xs" variant={mode === 'ar' ? 'primary' : 'tertiary'} onClick={() => setMode('ar')}>
+                      AR
+                    </Button>
+                  </AiGlowRing>
                 </HStack>
               </HStack>
 
               {mode === 'map' && (
                 <VStack gap={0.5}>
-                  <Button
-                    size="xs"
-                    variant={colorByYear ? 'primary' : 'tertiary'}
-                    onClick={() => controller.setColorByYear(!colorByYear)}
-                  >
-                    Color by year built
-                  </Button>
-                  {colorByYear && (
+                  <HStack gap={0.5} style={{ alignItems: 'center' }}>
+                    <Button
+                      size="xs"
+                      variant={colorByYear ? 'primary' : 'tertiary'}
+                      onClick={() => controller.setColorByYear(!colorByYear)}
+                    >
+                      Color by year built
+                    </Button>
+                    {colorByYear && (
+                      // Tap to reveal, not true CSS hover — there's no hover
+                      // state on a phone touchscreen, and a tap works on both.
+                      <IconButton
+                        size="xs"
+                        variant="tertiary"
+                        name="info"
+                        accessibilityLabel={legendVisible ? 'Hide legend' : 'Show legend'}
+                        onClick={() => setLegendVisible((v) => !v)}
+                      />
+                    )}
+                  </HStack>
+                  {colorByYear && legendVisible && (
                     // Fixed 4-column grid, not flex-wrap — a predictable compact
                     // block (2 short rows) regardless of viewport width, instead
                     // of an unpredictable wrap of 9 variable-width chips.
@@ -190,20 +240,20 @@ export function App({ controller, arController, mapContainer, arContainer }: App
               )}
 
               <HStack gap={1}>
-                <Button
+                <IconButton
                   size="s"
                   variant={pose.position ? 'secondary' : 'primary'}
+                  name="location"
+                  accessibilityLabel={pose.position ? 'Location on' : 'Use my location'}
                   onClick={() => controller.pose.startGeolocation()}
-                >
-                  {pose.position ? 'Location on' : 'Use my location'}
-                </Button>
-                <Button
+                />
+                <IconButton
                   size="s"
                   variant={compassStatus === 'denied' ? 'negative' : pose.headingSource === 'compass' ? 'secondary' : 'primary'}
+                  name="compass"
+                  accessibilityLabel={pose.headingSource === 'compass' ? 'Compass on' : 'Use compass'}
                   onClick={async () => setCompassStatus(await controller.pose.startCompass())}
-                >
-                  {pose.headingSource === 'compass' ? 'Compass on' : 'Use compass'}
-                </Button>
+                />
               </HStack>
 
               {compassStatus === 'denied' && (
@@ -324,11 +374,6 @@ export function App({ controller, arController, mapContainer, arContainer }: App
                   />
                 )}
               </HStack>
-              {!hit && (
-                <Text font="body" color="fgMuted">
-                  Tap &quot;Use my location&quot; to start.
-                </Text>
-              )}
               {showPanelDetails && panelExpanded && hit && <IdentifyPanelDetails hit={hit} />}
             </>
           )}

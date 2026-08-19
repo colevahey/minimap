@@ -217,8 +217,23 @@ export class MapModeController {
         // be color-only here; color contrast alone reads fine at this opacity.
         'fill-extrusion-opacity': 0.75,
         // Most footprints get a real height_m from floors × 3.5m (§3); the rest
-        // (no Assessor match) fall back to a flat ~1-story placeholder.
-        'fill-extrusion-height': ['coalesce', ['get', 'height_m'], 3.5],
+        // (no Assessor match) fall back to a flat ~1-story placeholder. Fades
+        // to 0 (flat/2D) below z12 and ramps up to full height by z15 — tiles
+        // now cover z10-17 (see build_tiles.sh) instead of just z14-17, so
+        // buildings stay visible zoomed out instead of vanishing entirely,
+        // but a wall of full-height 3D extrusions across a whole city at low
+        // zoom is both slow and visually chaotic, hence the fade to flat.
+        // AR mode is untouched by this — it does its own canvas projection
+        // in arMode.ts using height_m/floors directly, not this paint property.
+        'fill-extrusion-height': [
+          'interpolate',
+          ['linear'],
+          ['zoom'],
+          12,
+          0,
+          15,
+          ['coalesce', ['get', 'height_m'], 3.5],
+        ],
         'fill-extrusion-base': 0,
       },
     });
@@ -265,20 +280,21 @@ export class MapModeController {
       return;
     }
 
-    if (pose.headingDeg === null) {
-      this.setHit(null);
-      this.updateRay(null);
-      this.emit(pose);
-      return;
-    }
-
+    // Default to due north when heading is unset, rather than showing no
+    // ray/hit at all — map mode's ray is just a preview drawn on the map
+    // itself (the user can see which way it's pointing), so a placeholder
+    // heading is harmless here. The UI still displays "heading unset" (see
+    // App.tsx) since pose.headingDeg itself is untouched — only this
+    // controller's own raycast uses the 0 fallback. AR mode does NOT do
+    // this (see arMode.ts): pointing a live camera and identifying whatever
+    // happens to be due north regardless of where the phone is actually
+    // aimed would be actively misleading, not a harmless preview.
+    const headingDeg = pose.headingDeg ?? 0;
     const buildings = queryNearbyBuildings(this.map);
-    const hit = raycast(pose.position, pose.headingDeg, buildings, RAY_MAX_RANGE_M);
+    const hit = raycast(pose.position, headingDeg, buildings, RAY_MAX_RANGE_M);
     const endpoint = hit ? toGeo(hit.x, hit.y, pose.position) : null;
     this.updateRay(
-      endpoint
-        ? { lng: endpoint[1], lat: endpoint[0] }
-        : rayCastPoint(pose.position, pose.headingDeg, RAY_MAX_RANGE_M),
+      endpoint ? { lng: endpoint[1], lat: endpoint[0] } : rayCastPoint(pose.position, headingDeg, RAY_MAX_RANGE_M),
       pose.position,
     );
     this.setHit(hit);
