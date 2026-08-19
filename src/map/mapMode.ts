@@ -1,4 +1,5 @@
 import maplibregl from 'maplibre-gl';
+import type { ExpressionSpecification } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Protocol } from 'pmtiles';
 import { toGeo } from '../core/geo';
@@ -28,6 +29,49 @@ const BASEMAP_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
 const RAY_MAX_RANGE_M = 650;
 const BUILDINGS_SOURCE = 'buildings';
 const BUILDINGS_SOURCE_LAYER = 'buildings';
+
+const HIGHLIGHT_COLOR = '#ff9d3f';
+const DEFAULT_BUILDING_COLOR = '#5db8ff';
+
+// Year-built choropleth (map mode only — a top-down color-by-magnitude read
+// doesn't translate to a camera overlay). Sequential = one hue, light→dark,
+// per the dataviz skill's validated ramp (single-hue blue, steps 150/300/
+// 450/550/700) — older buildings recede toward the surface, newer buildings
+// read as bold/dark. Buildings with no year_built get a neutral gray, kept
+// visually distinct from every ramp step so "no data" is never mistaken for
+// "very old."
+export const YEAR_COLOR_BUCKETS: { label: string; color: string }[] = [
+  { label: '< 1950', color: '#b7d3f6' },
+  { label: '1950–79', color: '#6da7ec' },
+  { label: '1980–99', color: '#2a78d6' },
+  { label: '2000–14', color: '#1c5cab' },
+  { label: '2015+', color: '#0d366b' },
+];
+export const YEAR_COLOR_NO_DATA = '#8a8f98';
+
+function buildingsFillColorExpression(colorByYear: boolean): ExpressionSpecification {
+  const baseColor: ExpressionSpecification | string = colorByYear
+    ? [
+        'case',
+        ['!', ['has', 'year_built']],
+        YEAR_COLOR_NO_DATA,
+        [
+          'step',
+          ['get', 'year_built'],
+          YEAR_COLOR_BUCKETS[0].color,
+          1950,
+          YEAR_COLOR_BUCKETS[1].color,
+          1980,
+          YEAR_COLOR_BUCKETS[2].color,
+          2000,
+          YEAR_COLOR_BUCKETS[3].color,
+          2015,
+          YEAR_COLOR_BUCKETS[4].color,
+        ],
+      ]
+    : DEFAULT_BUILDING_COLOR;
+  return ['case', ['boolean', ['feature-state', 'highlight'], false], HIGHLIGHT_COLOR, baseColor];
+}
 
 let protocolRegistered = false;
 
@@ -86,6 +130,7 @@ export interface MapModeState {
   pose: Pose;
   hit: RaycastHit | null;
   city: CityCode;
+  colorByYear: boolean;
 }
 
 export type MapModeListener = (state: MapModeState) => void;
@@ -107,6 +152,7 @@ export class MapModeController {
   private currentHit: RaycastHit | null = null;
   private layersReady = false;
   private city: CityCode = 'sea';
+  private colorByYear = false;
 
   constructor(container: HTMLElement) {
     ensurePmtilesProtocol();
@@ -153,7 +199,7 @@ export class MapModeController {
       source: BUILDINGS_SOURCE,
       'source-layer': BUILDINGS_SOURCE_LAYER,
       paint: {
-        'fill-extrusion-color': ['case', ['boolean', ['feature-state', 'highlight'], false], '#ff9d3f', '#5db8ff'],
+        'fill-extrusion-color': buildingsFillColorExpression(this.colorByYear),
         // fill-extrusion-opacity is constant-only in the style spec (unlike
         // -color) — no data/feature-state expressions — so highlight has to
         // be color-only here; color contrast alone reads fine at this opacity.
@@ -253,14 +299,14 @@ export class MapModeController {
   }
 
   private emit(pose: Pose): void {
-    const state: MapModeState = { pose, hit: this.currentHit, city: this.city };
+    const state: MapModeState = { pose, hit: this.currentHit, city: this.city, colorByYear: this.colorByYear };
     for (const listener of this.listeners) listener(state);
   }
 
-  /** Subscribes to pose/hit/city updates; immediately replays the current state. */
+  /** Subscribes to pose/hit/city/colorByYear updates; immediately replays the current state. */
   onUpdate(listener: MapModeListener): () => void {
     this.listeners.add(listener);
-    listener({ pose: this.pose.getPose(), hit: this.currentHit, city: this.city });
+    listener({ pose: this.pose.getPose(), hit: this.currentHit, city: this.city, colorByYear: this.colorByYear });
     return () => this.listeners.delete(listener);
   }
 
@@ -280,6 +326,16 @@ export class MapModeController {
     // gap is a multi-second detour, not a nice touch, for what's really just
     // a city switch.
     this.map.jumpTo({ center: config.center, zoom: 15.5 });
+  }
+
+  /** Toggles the year-built choropleth (map mode only, see YEAR_COLOR_BUCKETS). */
+  setColorByYear(enabled: boolean): void {
+    if (enabled === this.colorByYear) return;
+    this.colorByYear = enabled;
+    if (this.layersReady) {
+      this.map.setPaintProperty('buildings-fill', 'fill-extrusion-color', buildingsFillColorExpression(enabled));
+    }
+    this.emit(this.pose.getPose());
   }
 }
 

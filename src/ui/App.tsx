@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Box, HStack, VStack } from '@coinbase/cds-web/layout';
 import { Text } from '@coinbase/cds-web/typography';
 import { Button, IconButton } from '@coinbase/cds-web/buttons';
-import type { MapModeController, MapModeState } from '../map/mapMode';
+import { YEAR_COLOR_BUCKETS, YEAR_COLOR_NO_DATA, type MapModeController, type MapModeState } from '../map/mapMode';
 import type { ArModeController, ArModeState } from '../ar/arMode';
 import type { RaycastHit } from '../core/raycast';
 
@@ -68,6 +68,7 @@ export function App({ controller, arController, mapContainer, arContainer }: App
     pose: controller.pose.getPose(),
     hit: null,
     city: 'sea',
+    colorByYear: false,
   }));
   const [arState, setArState] = useState<ArModeState>(() => ({
     pose: controller.pose.getPose(),
@@ -94,7 +95,7 @@ export function App({ controller, arController, mapContainer, arContainer }: App
 
   const pose = mode === 'ar' ? arState.pose : mapState.pose;
   const hit = mode === 'ar' ? arState.hit : mapState.hit;
-  const { city } = mapState;
+  const { city, colorByYear } = mapState;
   const poorAccuracy =
     pose.headingAccuracyDeg !== null && (pose.headingAccuracyDeg < 0 || pose.headingAccuracyDeg > 25);
   const showPanelDetails = (mode === 'map' || arState.cameraStatus === 'active') && hit != null;
@@ -141,6 +142,39 @@ export function App({ controller, arController, mapContainer, arContainer }: App
                   </Button>
                 </HStack>
               </HStack>
+
+              {mode === 'map' && (
+                <VStack gap={0.5}>
+                  <Button
+                    size="xs"
+                    variant={colorByYear ? 'primary' : 'tertiary'}
+                    onClick={() => controller.setColorByYear(!colorByYear)}
+                  >
+                    Color by year built
+                  </Button>
+                  {colorByYear && (
+                    <HStack gap={1} style={{ flexWrap: 'wrap', alignItems: 'center' }}>
+                      {YEAR_COLOR_BUCKETS.map((bucket) => (
+                        <HStack key={bucket.label} gap={0.25} style={{ alignItems: 'center' }}>
+                          <Box borderRadius={100} style={{ width: 10, height: 10, backgroundColor: bucket.color }} />
+                          <Text font="legal" color="fgMuted">
+                            {bucket.label}
+                          </Text>
+                        </HStack>
+                      ))}
+                      <HStack gap={0.25} style={{ alignItems: 'center' }}>
+                        <Box
+                          borderRadius={100}
+                          style={{ width: 10, height: 10, backgroundColor: YEAR_COLOR_NO_DATA }}
+                        />
+                        <Text font="legal" color="fgMuted">
+                          no data
+                        </Text>
+                      </HStack>
+                    </HStack>
+                  )}
+                </VStack>
+              )}
 
               <HStack gap={1}>
                 <Button
