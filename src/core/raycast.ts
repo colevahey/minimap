@@ -1,4 +1,5 @@
 import { toLocal } from './geo';
+import { EYE_HEIGHT_M, M_PER_FLOOR } from './constants';
 import type { BuildingWithRing, LngLat } from './types';
 
 export interface RaycastHit {
@@ -73,9 +74,6 @@ export function raycastAllHits(
   }
   return hits.sort((a, b) => a.t - b.t);
 }
-
-const EYE_HEIGHT_M = 1.6;
-const M_PER_FLOOR = 3.5;
 
 /**
  * Height-aware raycast for AR mode (§8): flat first-intersection is wrong

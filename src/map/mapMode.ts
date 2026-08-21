@@ -6,6 +6,7 @@ import { toGeo } from '../core/geo';
 import { PoseManager, type Pose } from '../core/pose';
 import { raycast, type RaycastHit } from '../core/raycast';
 import { queryNearbyBuildings } from '../core/buildings';
+import { M_PER_FLOOR } from '../core/constants';
 import type { CityCode, LngLat } from '../core/types';
 
 interface CityConfig {
@@ -233,7 +234,7 @@ export class MapModeController {
           12,
           0,
           15,
-          ['coalesce', ['get', 'height_m'], 3.5],
+          ['coalesce', ['get', 'height_m'], M_PER_FLOOR],
         ],
         'fill-extrusion-base': 0,
       },

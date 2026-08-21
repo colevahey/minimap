@@ -3,10 +3,9 @@ import { toLocal } from '../core/geo';
 import type { Pose } from '../core/pose';
 import { raycastWithPitch, type RaycastHit } from '../core/raycast';
 import { queryNearbyBuildings } from '../core/buildings';
+import { EYE_HEIGHT_M, M_PER_FLOOR } from '../core/constants';
 import type { BuildingWithRing, LngLat } from '../core/types';
 
-const EYE_HEIGHT_M = 1.6;
-const M_PER_FLOOR = 3.5;
 const RAY_MAX_RANGE_M = 650;
 // Rough back-camera FOV — not per-device calibrated (§7 is a 2D canvas
 // overlay, not a real camera-intrinsics AR framework), so outlines will
@@ -237,7 +236,7 @@ export class ArModeController {
     height: number,
     isHit: boolean,
   ): void {
-    const roofHeight = b.height_m ?? (b.floors != null ? b.floors * M_PER_FLOOR : 3.5);
+    const roofHeight = b.height_m ?? (b.floors != null ? b.floors * M_PER_FLOOR : M_PER_FLOOR);
     const base = this.projectRing(b.ring, 0, observer, headingDeg, pitchDeg, width, height);
     const roof = this.projectRing(b.ring, roofHeight, observer, headingDeg, pitchDeg, width, height);
 
