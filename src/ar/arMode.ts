@@ -8,10 +8,16 @@ import type { BuildingWithRing, LngLat } from '../core/types';
 const EYE_HEIGHT_M = 1.6;
 const M_PER_FLOOR = 3.5;
 const RAY_MAX_RANGE_M = 650;
-// Rough back-camera horizontal FOV — not per-device calibrated (§7 is a 2D
-// canvas overlay, not a real camera-intrinsics AR framework), so outlines
-// will drift a bit on devices with a notably wider/narrower lens than this.
+// Rough back-camera FOV — not per-device calibrated (§7 is a 2D canvas
+// overlay, not a real camera-intrinsics AR framework), so outlines will
+// drift a bit on devices with a notably wider/narrower lens than this.
+// Vertical is set independently rather than derived from the horizontal
+// value times the portrait aspect ratio (390/844 ≈ 2.16×) — that formula
+// gives a ~140° vertical FOV, well past fisheye territory and nothing like
+// an actual phone camera, which made buildings project to the wrong place
+// on screen relative to where they actually are.
 const HORIZONTAL_FOV_DEG = 65;
+const VERTICAL_FOV_DEG = 75;
 
 export type CameraStatus = 'idle' | 'starting' | 'active' | 'denied' | 'unsupported' | 'error';
 
@@ -161,7 +167,7 @@ export class ArModeController {
     const relEl = elevationDeg - pitchDeg;
 
     const hFovHalf = HORIZONTAL_FOV_DEG / 2;
-    const vFovHalf = (HORIZONTAL_FOV_DEG * (height / width)) / 2;
+    const vFovHalf = VERTICAL_FOV_DEG / 2;
     if (Math.abs(relAz) > hFovHalf || Math.abs(relEl) > vFovHalf) return null;
 
     return {
@@ -212,6 +218,59 @@ export class ArModeController {
     ctx.stroke();
   }
 
+  /**
+   * Draws a building as a wireframe box (base ring + roof ring + vertical
+   * edges connecting corresponding corners) rather than just its flat
+   * ground footprint — a footprint outline alone traces where the building
+   * *starts*, not the vertical facade you actually see through the camera,
+   * which is what read as a "flat silhouette" floating in the frame rather
+   * than an outline anchored to the real building. Every building gets a
+   * roof height (real height_m, or the same floors×3.5m/flat-placeholder
+   * fallback raycastWithPitch and map mode use), not just the current hit.
+   */
+  private drawBuildingWireframe(
+    b: BuildingWithRing,
+    observer: LngLat,
+    headingDeg: number,
+    pitchDeg: number,
+    width: number,
+    height: number,
+    isHit: boolean,
+  ): void {
+    const roofHeight = b.height_m ?? (b.floors != null ? b.floors * M_PER_FLOOR : 3.5);
+    const base = this.projectRing(b.ring, 0, observer, headingDeg, pitchDeg, width, height);
+    const roof = this.projectRing(b.ring, roofHeight, observer, headingDeg, pitchDeg, width, height);
+
+    const anyBaseVisible = base.some((p) => p !== null);
+    const anyRoofVisible = roof.some((p) => p !== null);
+    if (!anyBaseVisible && !anyRoofVisible) return;
+
+    const color = isHit ? '#ff9d3f' : 'rgba(93,184,255,0.7)';
+    const lineWidth = isHit ? 3 : 1.5;
+    if (anyBaseVisible) this.strokePolyline(base, color, lineWidth);
+    if (anyRoofVisible) this.strokePolyline(roof, color, lineWidth);
+
+    // Vertical corner edges — only where both ends are on-screen. A corner
+    // whose base fell outside the FOV (e.g. base below frame when pitched
+    // up at a very tall/near building) just doesn't get a connecting edge,
+    // rather than being clipped and extended to the screen boundary — a
+    // known simplification (per-vertex FOV clipping, not full line/frustum
+    // clipping), so a wall can still visually "stop" mid-air in that case
+    // instead of running off the bottom of the screen like it would in reality.
+    const { ctx } = this;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lineWidth;
+    for (let i = 0; i < base.length; i++) {
+      const basePoint = base[i];
+      const roofPoint = roof[i];
+      if (!basePoint || !roofPoint) continue;
+      ctx.beginPath();
+      ctx.moveTo(basePoint.x, basePoint.y);
+      ctx.lineTo(roofPoint.x, roofPoint.y);
+      ctx.stroke();
+    }
+  }
+
   private draw(): void {
     const { ctx, canvas } = this;
     const width = canvas.width;
@@ -225,17 +284,7 @@ export class ArModeController {
 
     for (const b of this.nearbyBuildings) {
       const isHit = this.currentHit?.b.id === b.id;
-      const base = this.projectRing(b.ring, 0, observer, headingDeg, pitchDeg, width, height);
-      if (base.every((p) => p === null)) continue;
-      this.strokePolyline(base, isHit ? '#ff9d3f' : 'rgba(93,184,255,0.7)', isHit ? 3 : 1.5);
-
-      if (isHit) {
-        const heightM = b.height_m ?? (b.floors != null ? b.floors * M_PER_FLOOR : null);
-        if (heightM != null) {
-          const roof = this.projectRing(b.ring, heightM, observer, headingDeg, pitchDeg, width, height);
-          this.strokePolyline(roof, '#ff9d3f', 2);
-        }
-      }
+      this.drawBuildingWireframe(b, observer, headingDeg, pitchDeg, width, height, isHit);
     }
   }
 

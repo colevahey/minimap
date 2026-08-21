@@ -57,7 +57,6 @@ function CollapseToggle({
 const OVERLAY_TEXT_STYLE = { color: '#0b0b0b', textShadow: '0 1px 3px rgba(255,255,255,0.8)' };
 const OVERLAY_TEXT_MUTED_STYLE = { color: '#3a3a3a', textShadow: '0 1px 3px rgba(255,255,255,0.8)' };
 const OVERLAY_TEXT_NEGATIVE_STYLE = { color: '#cf202f', textShadow: '0 1px 3px rgba(255,255,255,0.8)' };
-const OVERLAY_TEXT_WARNING_STYLE = { color: '#b35900', textShadow: '0 1px 3px rgba(255,255,255,0.8)' };
 
 const AI_GRADIENT_KEYFRAMES = `
 @keyframes ai-glow-shift {
@@ -135,10 +134,8 @@ export function App({ controller, arController, mapContainer, arContainer }: App
     cameraStatus: 'idle',
   }));
   const [compassStatus, setCompassStatus] = useState<CompassStatus>('idle');
-  const [moreInfoExpanded, setMoreInfoExpanded] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [panelExpanded, setPanelExpanded] = useState(false);
-  const [legendHovered, setLegendHovered] = useState(false);
-  const [colorPickerOpen, setColorPickerOpen] = useState(false);
 
   useEffect(() => controller.onUpdate(setMapState), [controller]);
   useEffect(() => arController.onUpdate(setArState), [arController]);
@@ -164,212 +161,200 @@ export function App({ controller, arController, mapContainer, arContainer }: App
     <>
       <style>{AI_GRADIENT_KEYFRAMES}</style>
       <Box position="absolute" top={0} left={0} right={0} padding={3} style={{ pointerEvents: 'none' }}>
-        <VStack gap={2} style={{ pointerEvents: 'auto', maxWidth: 360 }}>
-          <HStack gap={1} style={{ alignItems: 'center', flexWrap: 'wrap' }}>
-            <Text as="h1" font="title3" style={{ ...OVERLAY_TEXT_STYLE, marginRight: 4 }}>
-              Minimap
-            </Text>
+        <HStack gap={1} style={{ pointerEvents: 'auto', alignItems: 'center', maxWidth: 360 }}>
+          <Text as="h1" font="title3" style={{ ...OVERLAY_TEXT_STYLE, marginRight: 4, flexShrink: 0 }}>
+            Minimap
+          </Text>
 
-            <Button size="xs" variant="secondary" onClick={() => controller.switchCity(city === 'sea' ? 'nyc' : 'sea')}>
-              {city === 'sea' ? 'SEA' : 'NYC'}
-            </Button>
+          {(() => {
+            // Label shows the DESTINATION, not the current mode: "AR" while
+            // in map mode (tap to switch to AR), "Map" while in AR mode.
+            const modeToggle = (
+              <Button size="s" variant="secondary" onClick={() => setMode(mode === 'map' ? 'ar' : 'map')}>
+                {mode === 'map' ? 'AR' : 'Map'}
+              </Button>
+            );
+            // Glows when the destination is AR — the AI-feature invitation.
+            return mode === 'map' ? <AiGlowRing>{modeToggle}</AiGlowRing> : modeToggle;
+          })()}
 
-            {(() => {
-              // Label shows the DESTINATION, not the current mode: "AR" while
-              // in map mode (tap to switch to AR), "Map" while in AR mode.
-              const modeToggle = (
-                <Button size="xs" variant="secondary" onClick={() => setMode(mode === 'map' ? 'ar' : 'map')}>
-                  {mode === 'map' ? 'AR' : 'Map'}
-                </Button>
-              );
-              // Glows when the destination is AR — the AI-feature invitation.
-              return mode === 'map' ? <AiGlowRing>{modeToggle}</AiGlowRing> : modeToggle;
-            })()}
+          <IconButton
+            size="s"
+            variant={pose.position ? 'secondary' : 'primary'}
+            name="location"
+            accessibilityLabel={pose.position ? 'Location on' : 'Use my location'}
+            onClick={() => controller.pose.startGeolocation()}
+          />
+          <IconButton
+            size="s"
+            variant={compassStatus === 'denied' ? 'negative' : pose.headingSource === 'compass' ? 'secondary' : 'primary'}
+            name="compass"
+            accessibilityLabel={pose.headingSource === 'compass' ? 'Compass on' : 'Use compass'}
+            onClick={async () => setCompassStatus(await controller.pose.startCompass())}
+          />
 
-            {mode === 'map' && (
-              <Box
-                style={{ position: 'relative' }}
-                onMouseEnter={() => setLegendHovered(true)}
-                onMouseLeave={() => setLegendHovered(false)}
+          {/* Only the controls reached for constantly (mode, location, compass)
+              stay in the always-visible row. City, color mode, and the sensor
+              sliders are occasional-use, so they live behind this one entry
+              point instead of competing for space on every screen — that
+              competition was what pushed the row to wrap on narrow phones. */}
+          <Box style={{ position: 'relative', marginLeft: 'auto' }}>
+            <IconButton
+              size="s"
+              variant="tertiary"
+              name="settings"
+              accessibilityLabel={settingsOpen ? 'Hide settings' : 'Show settings'}
+              onClick={() => setSettingsOpen((v) => !v)}
+            />
+            {settingsOpen && (
+              <VStack
+                gap={3}
+                background="bg"
+                elevation={2}
+                borderRadius={300}
+                padding={3}
+                style={{ position: 'absolute', top: '110%', right: 0, zIndex: 10, width: 240 }}
               >
-                <Button size="xs" variant="secondary" onClick={() => setColorPickerOpen((v) => !v)}>
-                  {colorByYear ? 'Year built' : 'Default'} ▾
-                </Button>
-                {colorPickerOpen && (
-                  <VStack
-                    gap={0}
-                    background="bg"
-                    elevation={2}
-                    borderRadius={200}
-                    style={{ position: 'absolute', top: '110%', right: 0, zIndex: 10, minWidth: 130, overflow: 'hidden' }}
-                  >
+                <VStack gap={1}>
+                  <Text font="label2" color="fgMuted">
+                    City
+                  </Text>
+                  <HStack gap={1}>
                     <Button
                       size="xs"
-                      variant={!colorByYear ? 'primary' : 'tertiary'}
-                      onClick={() => {
-                        controller.setColorByYear(false);
-                        setColorPickerOpen(false);
-                      }}
-                      style={{ borderRadius: 0, justifyContent: 'flex-start' }}
+                      variant={city === 'sea' ? 'primary' : 'secondary'}
+                      onClick={() => controller.switchCity('sea')}
                     >
-                      Default
+                      Seattle
                     </Button>
                     <Button
                       size="xs"
-                      variant={colorByYear ? 'primary' : 'tertiary'}
-                      onClick={() => {
-                        controller.setColorByYear(true);
-                        setColorPickerOpen(false);
-                      }}
-                      style={{ borderRadius: 0, justifyContent: 'flex-start' }}
+                      variant={city === 'nyc' ? 'primary' : 'secondary'}
+                      onClick={() => controller.switchCity('nyc')}
                     >
-                      Year built
+                      New York
                     </Button>
+                  </HStack>
+                </VStack>
+
+                {mode === 'map' && (
+                  <VStack gap={1}>
+                    <Text font="label2" color="fgMuted">
+                      Building color
+                    </Text>
+                    <HStack gap={1}>
+                      <Button size="xs" variant={!colorByYear ? 'primary' : 'secondary'} onClick={() => controller.setColorByYear(false)}>
+                        Default
+                      </Button>
+                      <Button size="xs" variant={colorByYear ? 'primary' : 'secondary'} onClick={() => controller.setColorByYear(true)}>
+                        Year built
+                      </Button>
+                    </HStack>
+                    {/* Shown inline whenever "Year built" is selected, not on
+                        hover — this panel is already an intentional-tap
+                        surface, and hover doesn't fire on a touchscreen. */}
+                    {colorByYear && (
+                      <Box
+                        style={{
+                          display: 'grid',
+                          // minmax(0, 1fr), not bare 1fr — a bare 1fr track's
+                          // implicit minimum is its content's min-content
+                          // width, so a long label ("1900–19") would silently
+                          // widen the grid past the popover's fixed width.
+                          gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                          gap: '4px 8px',
+                          marginTop: 4,
+                        }}
+                      >
+                        {[...YEAR_COLOR_BUCKETS, { label: 'no data', color: YEAR_COLOR_NO_DATA }].map((bucket) => (
+                          <HStack key={bucket.label} gap={0.25} style={{ alignItems: 'center', minWidth: 0 }}>
+                            <Box
+                              borderRadius={100}
+                              style={{ width: 8, height: 8, flexShrink: 0, backgroundColor: bucket.color }}
+                            />
+                            <Text font="legal" color="fgMuted" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {bucket.label}
+                            </Text>
+                          </HStack>
+                        ))}
+                      </Box>
+                    )}
                   </VStack>
                 )}
-                {/* Hover tooltip, not click — only when "Year built" is the active
-                    selection, and not while the picker itself is open (avoids two
-                    popovers stacked on the same button). Note hover doesn't fire on
-                    a touchscreen the way it does with a mouse; this is desktop-first. */}
-                {colorByYear && legendHovered && !colorPickerOpen && (
-                  <Box
-                    background="bg"
-                    elevation={2}
-                    borderRadius={200}
-                    padding={2}
-                    style={{
-                      position: 'absolute',
-                      top: '110%',
-                      // Anchored from the right, not left — this button can sit
-                      // mid-row, and a 236px-wide tooltip extending rightward
-                      // from there clips off the edge of a phone screen.
-                      // Extending leftward instead stays inside the viewport.
-                      right: 0,
-                      zIndex: 10,
-                      display: 'grid',
-                      // minmax(0, 1fr), not bare 1fr — a bare 1fr track's
-                      // implicit minimum is its content's min-content width, so
-                      // a long label ("1900–19") silently overrides the
-                      // explicit `width` below and the grid renders wider than
-                      // intended (clipped off the edge of the screen). minmax(0, …)
-                      // lets tracks actually shrink to fit, wrapping text instead.
-                      gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
-                      gap: '4px 6px',
-                      width: 236,
-                    }}
-                  >
-                    {[...YEAR_COLOR_BUCKETS, { label: 'no data', color: YEAR_COLOR_NO_DATA }].map((bucket) => (
-                      <HStack key={bucket.label} gap={0.25} style={{ alignItems: 'center', minWidth: 0 }}>
-                        <Box
-                          borderRadius={100}
-                          style={{ width: 8, height: 8, flexShrink: 0, backgroundColor: bucket.color }}
-                        />
-                        <Text font="legal" color="fgMuted" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {bucket.label}
-                        </Text>
-                      </HStack>
-                    ))}
-                  </Box>
-                )}
-              </Box>
-            )}
 
-            <IconButton
-              size="xs"
-              variant={pose.position ? 'secondary' : 'primary'}
-              name="location"
-              accessibilityLabel={pose.position ? 'Location on' : 'Use my location'}
-              onClick={() => controller.pose.startGeolocation()}
-            />
-            <IconButton
-              size="xs"
-              variant={compassStatus === 'denied' ? 'negative' : pose.headingSource === 'compass' ? 'secondary' : 'primary'}
-              name="compass"
-              accessibilityLabel={pose.headingSource === 'compass' ? 'Compass on' : 'Use compass'}
-              onClick={async () => setCompassStatus(await controller.pose.startCompass())}
-            />
+                <VStack gap={1}>
+                  <Text font="label2" color="fgMuted">
+                    Sensors
+                  </Text>
+                  {compassStatus === 'denied' && (
+                    <Text font="caption" color="fgNegative">
+                      Compass permission denied — use the heading slider below.
+                    </Text>
+                  )}
+                  {compassStatus === 'unsupported' && (
+                    <Text font="caption" color="fgMuted">
+                      No compass sensor on this device — use the heading slider below.
+                    </Text>
+                  )}
+                  {poorAccuracy && (
+                    <Text font="caption" color="fgWarning">
+                      Compass accuracy is poor — figure-8 the phone to calibrate.
+                    </Text>
+                  )}
 
-            {/* Reveals the heading/pitch sliders and compass status — "info"
-                fits what this actually shows now that these controls live in a
-                single row instead of a card the arrow used to expand downward. */}
-            <IconButton
-              size="xs"
-              variant="tertiary"
-              name="info"
-              accessibilityLabel={moreInfoExpanded ? 'Hide sensor info' : 'Show sensor info'}
-              onClick={() => setMoreInfoExpanded((v) => !v)}
-            />
-          </HStack>
+                  <VStack gap={0.5}>
+                    <Text font="caption" color="fgMuted">
+                      Heading {pose.headingDeg !== null ? `${Math.round(pose.headingDeg)}°` : 'unset'}
+                    </Text>
+                    <input
+                      type="range"
+                      min={0}
+                      max={359}
+                      value={Math.round(pose.headingDeg ?? 0)}
+                      onChange={(e) => controller.pose.setManualHeading(Number(e.target.value))}
+                      style={{ width: '100%' }}
+                      aria-label="Manual heading"
+                    />
+                  </VStack>
 
-          {moreInfoExpanded && (
-            <>
-              {compassStatus === 'denied' && (
-                <Text font="caption" style={OVERLAY_TEXT_NEGATIVE_STYLE}>
-                  Compass permission denied — use the heading slider below.
-                </Text>
-              )}
-              {compassStatus === 'unsupported' && (
-                <Text font="caption" style={OVERLAY_TEXT_MUTED_STYLE}>
-                  No compass sensor on this device — use the heading slider below.
-                </Text>
-              )}
-              {poorAccuracy && (
-                <Text font="caption" style={OVERLAY_TEXT_WARNING_STYLE}>
-                  Compass accuracy is poor — figure-8 the phone to calibrate.
-                </Text>
-              )}
+                  {pose.headingSource === 'compass' && (
+                    <VStack gap={0.5}>
+                      <Text font="caption" color="fgMuted">
+                        Heading offset nudge
+                      </Text>
+                      <input
+                        type="range"
+                        min={-30}
+                        max={30}
+                        defaultValue={0}
+                        onChange={(e) => controller.pose.setManualHeadingOffset(Number(e.target.value))}
+                        style={{ width: '100%' }}
+                        aria-label="Compass offset nudge"
+                      />
+                    </VStack>
+                  )}
 
-              <VStack gap={0.5}>
-                <Text font="caption" style={OVERLAY_TEXT_MUTED_STYLE}>
-                  Heading {pose.headingDeg !== null ? `${Math.round(pose.headingDeg)}°` : 'unset'}
-                </Text>
-                <input
-                  type="range"
-                  min={0}
-                  max={359}
-                  value={Math.round(pose.headingDeg ?? 0)}
-                  onChange={(e) => controller.pose.setManualHeading(Number(e.target.value))}
-                  style={{ width: '100%' }}
-                  aria-label="Manual heading"
-                />
+                  {mode === 'ar' && (
+                    <VStack gap={0.5}>
+                      <Text font="caption" color="fgMuted">
+                        Pitch (§8 height-occlusion) {pose.pitchDeg !== null ? `${Math.round(pose.pitchDeg)}°` : 'unset'}
+                      </Text>
+                      <input
+                        type="range"
+                        min={-45}
+                        max={80}
+                        value={Math.round(pose.pitchDeg ?? 0)}
+                        onChange={(e) => controller.pose.setManualPitch(Number(e.target.value))}
+                        style={{ width: '100%' }}
+                        aria-label="Manual pitch"
+                      />
+                    </VStack>
+                  )}
+                </VStack>
               </VStack>
-
-              {pose.headingSource === 'compass' && (
-                <VStack gap={0.5}>
-                  <Text font="caption" style={OVERLAY_TEXT_MUTED_STYLE}>
-                    Heading offset nudge
-                  </Text>
-                  <input
-                    type="range"
-                    min={-30}
-                    max={30}
-                    defaultValue={0}
-                    onChange={(e) => controller.pose.setManualHeadingOffset(Number(e.target.value))}
-                    style={{ width: '100%' }}
-                    aria-label="Compass offset nudge"
-                  />
-                </VStack>
-              )}
-
-              {mode === 'ar' && (
-                <VStack gap={0.5}>
-                  <Text font="caption" style={OVERLAY_TEXT_MUTED_STYLE}>
-                    Pitch (§8 height-occlusion) {pose.pitchDeg !== null ? `${Math.round(pose.pitchDeg)}°` : 'unset'}
-                  </Text>
-                  <input
-                    type="range"
-                    min={-45}
-                    max={80}
-                    value={Math.round(pose.pitchDeg ?? 0)}
-                    onChange={(e) => controller.pose.setManualPitch(Number(e.target.value))}
-                    style={{ width: '100%' }}
-                    aria-label="Manual pitch"
-                  />
-                </VStack>
-              )}
-            </>
-          )}
-        </VStack>
+            )}
+          </Box>
+        </HStack>
       </Box>
 
       <Box position="absolute" bottom={0} left={0} right={0} padding={3} style={{ pointerEvents: 'none' }}>
