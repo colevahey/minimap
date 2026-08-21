@@ -309,11 +309,17 @@ export class MapModeController {
   }
 
   private updateObserverMarker(pose: Pose): void {
+    // getSource<TSource extends Source>() has no default for TSource, so this
+    // cast is what drives it to GeoJSONSource in the first place — removing it
+    // changes TSource's inferred type back to the base `Source` (which lacks
+    // .setData) and breaks the build, despite the lint rule below.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- see comment above
     const source = this.map.getSource('observer') as maplibregl.GeoJSONSource | undefined;
     source?.setData(pose.position ? pointFeature(pose.position) : emptyFeatureCollection());
   }
 
   private updateRay(endpoint: LngLat | null, observer?: LngLat): void {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- see updateObserverMarker above.
     const source = this.map.getSource('ray') as maplibregl.GeoJSONSource | undefined;
     if (!source) return;
     if (!endpoint || !observer) {

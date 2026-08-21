@@ -28,7 +28,7 @@ export function queryNearbyBuildings(map: MapLibreMap): BuildingWithRing[] {
       // MVT/tippecanoe flattens nested objects to a JSON string — the pipeline
       // (pipeline/schema.py) emits `attrs` as a real object, but by the time
       // it round-trips through sea.pmtiles it arrives here as a string.
-      attrs: typeof props.attrs === 'string' ? JSON.parse(props.attrs) : undefined,
+      attrs: typeof props.attrs === 'string' ? (JSON.parse(props.attrs) as Record<string, string | number>) : undefined,
       ring,
     });
   }

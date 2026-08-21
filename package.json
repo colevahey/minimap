@@ -16,7 +16,8 @@
     "deploy:pages": "npm run build:pages && gh-pages -d dist",
     "preview": "vite preview",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@coinbase/cds-web": "^9.10.2",
@@ -26,11 +27,17 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.3",
+    "eslint": "^10.8.1",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.4",
     "gh-pages": "^6.3.0",
+    "globals": "^17.11.0",
     "typescript": "^5.6.3",
+    "typescript-eslint": "^8.67.0",
     "vite": "^5.4.11",
     "vite-plugin-pwa": "^0.20.5",
     "vitest": "^2.1.5"

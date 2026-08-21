@@ -144,7 +144,7 @@ export function App({ controller, arController, mapContainer, arContainer }: App
     mapContainer.style.display = mode === 'map' ? 'block' : 'none';
     arContainer.style.display = mode === 'ar' ? 'block' : 'none';
     if (mode === 'ar') {
-      arController.start();
+      void arController.start();
     } else {
       arController.stop();
     }
