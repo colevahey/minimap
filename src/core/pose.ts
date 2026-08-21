@@ -154,8 +154,20 @@ export class PoseManager {
     this.emit();
   }
 
+  /** Starts the live geolocation watch on first call. On every call —
+   * including while already tracking — re-emits so the caller can re-center
+   * on the position the watch has already given us. Deliberately does NOT
+   * call getCurrentPosition() to force a fresh fix here: some browsers
+   * (confirmed in Chromium) simply never resolve a getCurrentPosition call
+   * made while a watchPosition is already active, which would silently hang
+   * the "recenter" action. The watch itself already keeps `pose.position`
+   * as fresh as the OS is willing to report. */
   startGeolocation(): void {
-    if (this.watchId !== null || !('geolocation' in navigator)) return;
+    if (!('geolocation' in navigator)) return;
+    if (this.watchId !== null) {
+      this.emit();
+      return;
+    }
     this.watchId = navigator.geolocation.watchPosition(
       (pos) => {
         this.pose.position = { lng: pos.coords.longitude, lat: pos.coords.latitude };
