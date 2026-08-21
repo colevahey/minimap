@@ -180,14 +180,14 @@ export function App({ controller, arController, mapContainer, arContainer }: App
 
           <IconButton
             size="s"
-            variant={pose.position ? 'secondary' : 'primary'}
+            variant={pose.position ? 'primary' : 'secondary'}
             name="location"
             accessibilityLabel={pose.position ? 'Location on' : 'Use my location'}
-            onClick={() => controller.pose.startGeolocation()}
+            onClick={() => controller.startGeolocation()}
           />
           <IconButton
             size="s"
-            variant={compassStatus === 'denied' ? 'negative' : pose.headingSource === 'compass' ? 'secondary' : 'primary'}
+            variant={compassStatus === 'denied' ? 'negative' : pose.headingSource === 'compass' ? 'primary' : 'secondary'}
             name="compass"
             accessibilityLabel={pose.headingSource === 'compass' ? 'Compass on' : 'Use compass'}
             onClick={async () => setCompassStatus(await controller.pose.startCompass())}

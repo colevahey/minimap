@@ -165,6 +165,7 @@ export class MapModeController {
   private layersReady = false;
   private city: CityCode = 'sea';
   private colorByYear = false;
+  private panToNextPosition = false;
 
   constructor(container: HTMLElement) {
     ensurePmtilesProtocol();
@@ -280,6 +281,11 @@ export class MapModeController {
       return;
     }
 
+    if (this.panToNextPosition) {
+      this.panToNextPosition = false;
+      this.map.easeTo({ center: [pose.position.lng, pose.position.lat], duration: 800 });
+    }
+
     // Default to due north when heading is unset, rather than showing no
     // ray/hit at all — map mode's ray is just a preview drawn on the map
     // itself (the user can see which way it's pointing), so a placeholder
@@ -364,6 +370,15 @@ export class MapModeController {
       this.map.setPaintProperty('buildings-fill', 'fill-extrusion-color', buildingsFillColorExpression(enabled));
     }
     this.emit(this.pose.getPose());
+  }
+
+  /** Starts the geolocation watch and smooth-pans the map to the first fix
+   * that comes back — a one-shot pan, not on every subsequent update, so a
+   * live GPS watch doesn't keep yanking the view out from under someone
+   * who's since panned/zoomed elsewhere on their own. */
+  startGeolocation(): void {
+    this.panToNextPosition = true;
+    this.pose.startGeolocation();
   }
 }
 
